@@ -1,0 +1,16 @@
+export const colors = {
+  primary: '#4F46E5',
+  primaryPressed: '#4338CA',
+  onPrimary: '#FFFFFF',
+  background: '#F8FAFC',
+  surface: '#FFFFFF',
+  inputBackground: '#F1F5F9',
+  border: '#E2E8F0',
+  text: '#0F172A',
+  textMuted: '#64748B',
+  textSubtle: '#94A3B8',
+  iconInactive: '#94A3B8',
+  danger: '#DC2626',
+  accent: '#F97316',
+  ripple: 'rgba(79, 70, 229, 0.12)',
+} as const;
