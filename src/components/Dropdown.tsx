@@ -87,7 +87,7 @@ export function Dropdown<T extends string>({
                     {option.label}
                   </Text>
                   {isSelected ? (
-                    <Ionicons name="checkmark" size={18} color={colors.primary} />
+                    <Ionicons name="checkmark" size={18} color={colors.ink} />
                   ) : null}
                 </Pressable>
               );
@@ -108,7 +108,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: colors.inputBackground,
   },
   triggerPressed: {
     backgroundColor: colors.border,
@@ -147,6 +146,6 @@ const styles = StyleSheet.create({
   },
   itemTextSelected: {
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.ink,
   },
 });

@@ -10,11 +10,36 @@ export default function RootLayout() {
       <SelectedDateProvider>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          {/* Starts at half height; drag up for full screen. */}
           <Stack.Screen
             name="add"
             options={{
               presentation: 'formSheet',
-              sheetAllowedDetents: 'fitToContents',
+              sheetAllowedDetents: [0.5, 1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+              headerShown: false,
+            }}
+          />
+          {/* Opened from the add sheet, on top of it. Starts at 85% height, which shows the whole
+              calendar and the Add time button; drag up for full screen. */}
+          <Stack.Screen
+            name="due-date"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.85, 1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+              headerShown: false,
+            }}
+          />
+          {/* A todo's details, opened by tapping it in the list. Starts at half height; drag up
+              for full screen (for a long description). */}
+          <Stack.Screen
+            name="todo/[id]"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.5, 1],
               sheetGrabberVisible: true,
               sheetCornerRadius: 24,
               headerShown: false,

@@ -1,5 +1,6 @@
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import type { NativeStackNavigationProp } from 'expo-router/native-stack';
+import { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -12,28 +13,53 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DueDateField } from '@/components/DueDateField';
+import { PriorityField } from '@/components/PriorityField';
+import { SheetGrabber } from '@/components/SheetGrabber';
 import { colors } from '@/constants/theme';
-import type { DateKey } from '@/lib/dates';
+import { isDateKey, isTimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
-import { useTodos } from '@/store/todos';
+import { useTodos, type Priority } from '@/store/todos';
 
 /**
  * Bottom sheet for adding a todo (presented as a form sheet, see src/app/_layout.tsx).
- * The sheet sizes itself to this content, so the root view must not use flex: 1.
+ * Opens at half height and can be dragged to full screen. The form stays at the top, so it's
+ * all visible at half height (on Android the content is laid out at full height either way).
  */
 export default function AddTodoScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { addTodo } = useTodos();
   const { todayKey, selectedDate, selectDate } = useSelectedDate();
+  const navigation = useNavigation<NativeStackNavigationProp<Record<string, object | undefined>>>();
+  const titleRef = useRef<TextInputInstance>(null);
   const descriptionRef = useRef<TextInputInstance>(null);
+
+  // Put the cursor in the name field (opening the keyboard) once the sheet has finished sliding
+  // up: focusing mid-animation can leave the keyboard closed on Android. Only the first time, so
+  // coming back from the due-date sheet doesn't pop the keyboard up again.
+  // (Web has no opening animation or transitionEnd event, so it uses autoFocus instead.)
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const unsubscribe = navigation.addListener('transitionEnd', (event) => {
+      if (event.data.closing) return;
+      unsubscribe();
+      titleRef.current?.focus();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<Priority>('medium');
   // Start on the day picked in the date strip, or today if that day is already past.
-  const [dueDate, setDueDate] = useState<DateKey>(() =>
-    selectedDate < todayKey ? todayKey : selectedDate,
-  );
+  const [initialDueDate] = useState(() => (selectedDate < todayKey ? todayKey : selectedDate));
+  // Set by the due-date sheet (src/app/due-date.tsx) when it closes with a pick.
+  const { dueDate: pickedDueDate, dueTime: pickedDueTime } = useLocalSearchParams<{
+    dueDate?: string;
+    dueTime?: string;
+  }>();
+  const dueDate = isDateKey(pickedDueDate) ? pickedDueDate : initialDueDate;
+  const dueTime = isTimeKey(pickedDueTime) ? pickedDueTime : undefined;
 
   const canAdd = title.trim().length > 0;
 
@@ -43,6 +69,8 @@ export default function AddTodoScreen() {
       title: title.trim(),
       description: description.trim() || undefined,
       dueDate,
+      dueTime,
+      priority,
     });
     // Show the todo's day, so the new todo is visible in the list right away.
     selectDate(dueDate);
@@ -54,35 +82,47 @@ export default function AddTodoScreen() {
 
   return (
     <View style={[styles.container, { paddingBottom: bottomPadding }]}>
-      <Text style={styles.heading}>New todo</Text>
+      <SheetGrabber />
 
-      <TextInput
-        style={styles.input}
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Title"
-        placeholderTextColor={colors.textMuted}
-        maxLength={120}
-        returnKeyType="next"
-        submitBehavior="submit"
-        onSubmitEditing={() => descriptionRef.current?.focus()}
-        accessibilityLabel="Title"
-      />
+      {/* Name and description sit close together, as one block. */}
+      <View>
+        {/* Multiline only so a long name wraps onto the next line: Enter still moves on to
+            the description instead of adding a line break, and pasted line breaks become spaces. */}
+        <TextInput
+          ref={titleRef}
+          autoFocus={Platform.OS === 'web'}
+          style={[styles.input, styles.title]}
+          value={title}
+          onChangeText={(text) => setTitle(text.replace(/\s*\n\s*/g, ' '))}
+          placeholder="Todo name"
+          placeholderTextColor={colors.textMuted}
+          maxLength={120}
+          multiline
+          returnKeyType="next"
+          submitBehavior="submit"
+          // Web ignores submitBehavior; this is what makes Enter submit there.
+          blurOnSubmit={Platform.OS === 'web'}
+          onSubmitEditing={() => descriptionRef.current?.focus()}
+          accessibilityLabel="Todo name"
+        />
 
-      <TextInput
-        ref={descriptionRef}
-        style={[styles.input, styles.description]}
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Description (optional)"
-        placeholderTextColor={colors.textMuted}
-        multiline
-        maxLength={500}
-        textAlignVertical="top"
-        accessibilityLabel="Description, optional"
-      />
+        <TextInput
+          ref={descriptionRef}
+          style={[styles.input, styles.description]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Description"
+          placeholderTextColor={colors.textMuted}
+          multiline
+          maxLength={500}
+          textAlignVertical="top"
+          accessibilityLabel="Description, optional"
+        />
+      </View>
 
-      <DueDateField value={dueDate} onChange={setDueDate} />
+      <DueDateField value={dueDate} time={dueTime} />
+
+      <PriorityField value={priority} onChange={setPriority} />
 
       <Pressable
         onPress={handleAdd}
@@ -102,30 +142,38 @@ export default function AddTodoScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Fills the sheet, so it's white all the way down when dragged to full screen.
   container: {
+    flex: 1,
     backgroundColor: colors.surface,
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingTop: Platform.OS === 'android' ? 10 : 20,
     gap: 12,
   },
-  heading: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 4,
-  },
+  // Plain field: no box or underline.
   input: {
-    minHeight: 52,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: colors.inputBackground,
-    fontSize: 16,
+    paddingHorizontal: 0,
+    // Hides the browser's focus box on web (phones don't draw one).
+    // A solid style is needed: the browser's default "auto" style ignores the width.
+    outlineStyle: 'solid',
+    outlineWidth: 0,
     color: colors.text,
   },
+  // The todo name reads as the sheet's title. Grows a line at a time as the name wraps.
+  title: {
+    paddingTop: 8,
+    paddingBottom: 4,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '700',
+  },
+  // Right under the name. One line to start; grows as you type, then scrolls.
   description: {
-    minHeight: 96,
+    paddingTop: 8,
+    paddingBottom: 8,
     maxHeight: 160,
+    fontSize: 16,
+    lineHeight: 22,
   },
   button: {
     marginTop: 4,

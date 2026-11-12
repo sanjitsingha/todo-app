@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
+import { CompletedSection } from '@/components/CompletedSection';
 import { DateHeader } from '@/components/DateHeader';
 import { DateStrip } from '@/components/DateStrip';
 import { Dropdown, type DropdownOption } from '@/components/Dropdown';
@@ -40,10 +41,14 @@ const EMPTY_STATES: Record<
   },
 };
 
-function matchesFilter(todo: Todo, filter: StatusFilter): boolean {
-  if (filter === 'pending') return !todo.completed;
-  if (filter === 'completed') return todo.completed;
-  return true;
+// Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
+const UNTIMED = '~';
+
+function compareTodos(a: Todo, b: Todo): number {
+  const timeA = a.dueTime ?? UNTIMED;
+  const timeB = b.dueTime ?? UNTIMED;
+  if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+  return a.createdAt - b.createdAt;
 }
 
 const keyExtractor = (todo: Todo) => todo.id;
@@ -54,14 +59,23 @@ export default function TodoScreen() {
   const { today, selectedDate, selectDate } = useSelectedDate();
   const [filter, setFilter] = useState<StatusFilter>('all');
 
-  // Todos due on the day picked in the strip that match the filter, in the order they were added.
-  const visibleTodos = useMemo(
-    () =>
-      todos
-        .filter((todo) => todo.dueDate === selectedDate && matchesFilter(todo, filter))
-        .sort((a, b) => a.createdAt - b.createdAt),
-    [todos, selectedDate, filter],
-  );
+  // Todos due on the day picked in the strip, split by status. Ones with a time come first,
+  // earliest first; the rest follow in the order they were added.
+  const { pendingTodos, completedTodos } = useMemo(() => {
+    const dayTodos = todos
+      .filter((todo) => todo.dueDate === selectedDate)
+      .sort(compareTodos);
+    return {
+      pendingTodos: dayTodos.filter((todo) => !todo.completed),
+      completedTodos: dayTodos.filter((todo) => todo.completed),
+    };
+  }, [todos, selectedDate]);
+
+  // "All todos": unfinished ones in the list, finished ones in a Completed section below it.
+  // "Pending" / "Completed": just that one list.
+  const listTodos = filter === 'completed' ? completedTodos : pendingTodos;
+  const showCompletedSection = filter === 'all' && completedTodos.length > 0;
+  const isEmpty = listTodos.length === 0 && !showCompletedSection;
 
   const emptyState = EMPTY_STATES[filter];
 
@@ -81,7 +95,7 @@ export default function TodoScreen() {
           />
         </View>
 
-        {visibleTodos.length === 0 ? (
+        {isEmpty ? (
           <ScreenPlaceholder
             icon={emptyState.icon}
             title={emptyState.title}
@@ -89,9 +103,12 @@ export default function TodoScreen() {
           />
         ) : (
           <FlatList
-            data={visibleTodos}
+            data={listTodos}
             keyExtractor={keyExtractor}
             renderItem={renderTodo}
+            ListFooterComponent={
+              showCompletedSection ? <CompletedSection todos={completedTodos} /> : undefined
+            }
             contentContainerStyle={styles.list}
           />
         )}

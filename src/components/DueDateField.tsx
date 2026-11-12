@@ -1,74 +1,39 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import DateTimePicker, {
-  DateTimePickerAndroid,
-  type DateTimePickerChangeEvent,
-} from '@react-native-community/datetimepicker';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
-import { formatDueDate, fromDateKey, toDateKey, type DateKey } from '@/lib/dates';
-
-type Props = {
-  value: DateKey;
-  onChange: (value: DateKey) => void;
-};
+import { formatDueDateTime, type DateKey, type TimeKey } from '@/lib/dates';
 
 /**
- * Due date row. On Android, tapping it opens the system date dialog.
- * On iOS, it shows the native compact date button.
+ * Due date row in the add-todo sheet, e.g. "Today, 4:12 pm". Tapping it opens the due-date
+ * sheet on top (src/app/due-date.tsx), which sends the pick back as the add sheet's
+ * `dueDate` / `dueTime` params.
  */
-export function DueDateField({ value, onChange }: Props) {
-  const date = fromDateKey(value);
-  const today = fromDateKey(toDateKey(new Date()));
+export function DueDateField({ value, time }: { value: DateKey; time?: TimeKey }) {
+  const router = useRouter();
+  const label = formatDueDateTime(value, time);
 
-  const handleChange = (_event: DateTimePickerChangeEvent, selected: Date) => {
-    onChange(toDateKey(selected));
-  };
-
-  const label = (
-    <View style={styles.label}>
-      <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-      <Text style={styles.labelText}>Due date</Text>
-    </View>
-  );
-
-  if (Platform.OS === 'ios') {
-    return (
-      <View style={styles.row}>
-        {label}
-        <DateTimePicker
-          value={date}
-          mode="date"
-          display="compact"
-          minimumDate={today}
-          onValueChange={handleChange}
-        />
-      </View>
-    );
-  }
-
-  const openPicker = () => {
+  const open = () => {
     Keyboard.dismiss();
-    DateTimePickerAndroid.open({
-      value: date,
-      mode: 'date',
-      minimumDate: today,
-      onValueChange: handleChange,
-    });
+    router.push({ pathname: '/due-date', params: time ? { value, time } : { value } });
   };
 
   return (
     <Pressable
-      onPress={openPicker}
+      onPress={open}
       style={styles.row}
       android_ripple={{ color: colors.ripple }}
       accessibilityRole="button"
-      accessibilityLabel={`Due date, ${formatDueDate(value)}`}
-      accessibilityHint="Opens a date picker"
+      accessibilityLabel={`Due date, ${label}`}
+      accessibilityHint="Opens date options, a calendar, and a time picker"
     >
-      {label}
+      <View style={styles.label}>
+        <Ionicons name="calendar-outline" size={20} color={colors.ink} />
+        <Text style={styles.labelText}>Due date</Text>
+      </View>
       <View style={styles.value}>
-        <Text style={styles.valueText}>{formatDueDate(value)}</Text>
+        <Text style={styles.valueText}>{label}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.iconInactive} />
       </View>
     </Pressable>
@@ -76,11 +41,9 @@ export function DueDateField({ value, onChange }: Props) {
 }
 
 const styles = StyleSheet.create({
+  // Plain row, like the text fields above it.
   row: {
     minHeight: 52,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: colors.inputBackground,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -103,6 +66,6 @@ const styles = StyleSheet.create({
   valueText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.ink,
   },
 });

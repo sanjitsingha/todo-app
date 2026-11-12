@@ -1,9 +1,7 @@
-import * as Haptics from 'expo-haptics';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,26 +11,15 @@ import {
 
 import { colors } from '@/constants/theme';
 import { addDays, shortWeekday, toDateKey, type DateKey } from '@/lib/dates';
+import { tick } from '@/lib/haptics';
 
 const DAY_WIDTH = 52;
 const DAYS_BEFORE = 365;
 // Due dates can be set far ahead, so the strip reaches 5 years forward.
 const DAYS_AFTER = 365 * 5;
 
-/** A light "tick" each time a new day snaps into the center, like the iOS picker wheel. */
-function tick() {
-  if (Platform.OS === 'android') {
-    // Segment_Tick is meant for stepping through a list, but only exists on Android 14+.
-    const type =
-      Platform.Version >= 34 ? Haptics.AndroidHaptics.Segment_Tick : Haptics.AndroidHaptics.Clock_Tick;
-    Haptics.performAndroidHapticsAsync(type).catch(() => {});
-  } else {
-    Haptics.selectionAsync().catch(() => {});
-  }
-}
-
 type Props = {
-  /** The real current date. Gets the orange dot. */
+  /** The real current date. Screen readers announce it as "today". */
   today: Date;
   /** The day in the center of the strip. */
   selectedDate: DateKey;
@@ -41,7 +28,7 @@ type Props = {
 
 /**
  * Swipeable row of days. The day in the center is the selected one: it grows and gets a
- * bordered box as it slides in, with a haptic tick per day while swiping.
+ * dark circle as it slides in, with a haptic tick per day while swiping.
  * Tapping a day, or changing `selectedDate` from outside (a todo added for another day,
  * midnight), slides the strip to that day.
  */
@@ -164,14 +151,34 @@ const DayItem = memo(function DayItem({ date, index, scrollX, isToday, onPress }
     const between = (from: number, to: number) =>
       scrollX.interpolate({ inputRange, outputRange: [from, to, from], extrapolate: 'clamp' });
     return {
-      boxOpacity: between(0, 1),
-      boxScale: between(0.8, 1),
-      contentScale: between(1, 1.2),
-      contentOpacity: between(0.4, 1),
+      circleOpacity: between(0, 1),
+      circleScale: between(0.8, 1),
+      labelScale: between(0.85, 1.15),
+      // The label fades from dark to white as the circle fills in behind it. (Text color
+      // can't run on the native driver, so it's two copies crossfading.)
+      darkLabelOpacity: between(0.3, 0),
+      lightLabelOpacity: between(0, 1),
     };
   }, [scrollX, index]);
 
   const weekday = shortWeekday(date);
+
+  const label = (onCircle: boolean) => (
+    <Animated.View
+      style={[
+        styles.label,
+        {
+          opacity: onCircle ? animated.lightLabelOpacity : animated.darkLabelOpacity,
+          transform: [{ scale: animated.labelScale }],
+        },
+      ]}
+    >
+      <Text style={[styles.number, onCircle && styles.textOnCircle]}>{date.getDate()}</Text>
+      <Text style={[styles.weekday, onCircle && styles.textOnCircle]}>
+        {weekday.toUpperCase()}
+      </Text>
+    </Animated.View>
+  );
 
   return (
     <Pressable
@@ -180,25 +187,22 @@ const DayItem = memo(function DayItem({ date, index, scrollX, isToday, onPress }
       accessibilityRole="button"
       accessibilityLabel={`${weekday} ${date.getDate()}${isToday ? ', today' : ''}`}
     >
-      <Animated.View
-        style={[
-          styles.box,
-          { opacity: animated.boxOpacity, transform: [{ scale: animated.boxScale }] },
-        ]}
-      />
-      <Animated.View
-        style={[
-          styles.content,
-          { opacity: animated.contentOpacity, transform: [{ scale: animated.contentScale }] },
-        ]}
-      >
-        <View style={[styles.dot, isToday && styles.dotVisible]} />
-        <Text style={styles.number}>{date.getDate()}</Text>
-        <Text style={styles.weekday}>{weekday.toUpperCase()}</Text>
-      </Animated.View>
+      <View style={styles.body}>
+        <Animated.View
+          style={[
+            styles.circle,
+            { opacity: animated.circleOpacity, transform: [{ scale: animated.circleScale }] },
+          ]}
+        />
+        {label(false)}
+        {label(true)}
+      </View>
     </Pressable>
   );
 });
+
+// Fits the number and weekday at their centered size, with a little room to spare.
+const CIRCLE_SIZE = 50;
 
 const styles = StyleSheet.create({
   list: {
@@ -208,32 +212,22 @@ const styles = StyleSheet.create({
   },
   day: {
     width: DAY_WIDTH,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  body: {
+    width: CIRCLE_SIZE,
+    height: CIRCLE_SIZE,
+  },
+  circle: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: CIRCLE_SIZE / 2,
+    backgroundColor: colors.ink,
+  },
+  label: {
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  box: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 3,
-    right: 3,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  content: {
-    alignItems: 'center',
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginBottom: 4,
-  },
-  dotVisible: {
-    backgroundColor: colors.accent,
   },
   number: {
     fontSize: 18,
@@ -242,10 +236,14 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   weekday: {
-    marginTop: 2,
+    marginTop: 1,
     fontSize: 10,
+    lineHeight: 12,
     fontWeight: '600',
     letterSpacing: 0.5,
     color: colors.text,
+  },
+  textOnCircle: {
+    color: colors.onInk,
   },
 });

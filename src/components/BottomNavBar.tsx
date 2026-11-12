@@ -57,7 +57,7 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
         <Ionicons
           name={focused ? tab.iconFocused : tab.icon}
           size={26}
-          color={focused ? colors.primary : colors.iconInactive}
+          color={focused ? colors.ink : colors.iconInactive}
         />
       </Pressable>
     );
