@@ -5,7 +5,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { DueDateChip, PriorityChip } from '@/components/TodoChips';
+import { DueDateChip, PriorityChip, ReminderChip } from '@/components/TodoChips';
 import { colors } from '@/constants/theme';
 import { useTodos, type Todo } from '@/store/todos';
 
@@ -69,6 +69,11 @@ export default function TodoDetailsScreen() {
       <DetailRow icon="flag-outline" label="Priority">
         <PriorityChip todo={todo} size="medium" />
       </DetailRow>
+      {todo.reminderTime ? (
+        <DetailRow icon="notifications-outline" label="Reminder">
+          <ReminderChip todo={todo} size="medium" />
+        </DetailRow>
+      ) : null}
 
       <Pressable
         onPress={toggle}

@@ -2,6 +2,7 @@ import Storage from 'expo-sqlite/kv-store';
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
+import { syncReminders } from '@/lib/reminders';
 
 export type Priority = 'high' | 'medium' | 'low';
 
@@ -13,12 +14,17 @@ export type Todo = {
   dueDate: DateKey;
   /** Time of day on the due date, if one was set. */
   dueTime?: TimeKey;
+  /** Time of day on the due date to get a notification, if one was set. */
+  reminderTime?: TimeKey;
   priority: Priority;
   completed: boolean;
   createdAt: number;
 };
 
-export type NewTodo = Pick<Todo, 'title' | 'description' | 'dueDate' | 'dueTime' | 'priority'>;
+export type NewTodo = Pick<
+  Todo,
+  'title' | 'description' | 'dueDate' | 'dueTime' | 'reminderTime' | 'priority'
+>;
 
 function isPriority(value: unknown): value is Priority {
   return value === 'high' || value === 'medium' || value === 'low';
@@ -45,6 +51,7 @@ function loadTodos(): Todo[] {
       completed: todo.completed === true,
       priority: isPriority(todo.priority) ? todo.priority : 'medium',
       dueTime: isTimeKey(todo.dueTime) ? todo.dueTime : undefined,
+      reminderTime: isTimeKey(todo.reminderTime) ? todo.reminderTime : undefined,
     }));
   } catch (error) {
     console.warn('Could not load saved todos', error);
@@ -66,6 +73,12 @@ export function TodosProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.warn('Could not save todos', error);
     }
+  }, [todos]);
+
+  // Keep the reminder notifications in step: scheduled for new todos, cancelled when a todo is
+  // finished, scheduled again when it's un-finished (if the time is still ahead).
+  useEffect(() => {
+    syncReminders(todos);
   }, [todos]);
 
   const addTodo = useCallback((todo: NewTodo) => {

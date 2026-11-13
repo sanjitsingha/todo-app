@@ -15,6 +15,7 @@ import { DueDatePicker } from '@/components/DueDatePicker';
 import { DueTimeField } from '@/components/DueTimeField';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { colors } from '@/constants/theme';
+import { toAddSheetParams } from '@/lib/addSheetParams';
 import { defaultTime, isDateKey, isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 
@@ -31,8 +32,10 @@ export default function DueDateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { today, todayKey } = useSelectedDate();
-  const params = useLocalSearchParams<{ value?: string; time?: string }>();
+  const params = useLocalSearchParams<{ value?: string; time?: string; reminderTime?: string }>();
   const current = isDateKey(params.value) && params.value >= todayKey ? params.value : todayKey;
+  // Not changed here; handed back as is (see src/lib/addSheetParams.ts).
+  const reminderTime = isTimeKey(params.reminderTime) ? params.reminderTime : undefined;
   const [initialTime] = useState(() => (isTimeKey(params.time) ? params.time : null));
   const [time, setTime] = useState<TimeKey | null>(initialTime);
 
@@ -44,7 +47,7 @@ export default function DueDateScreen() {
     // The add sheet's params are replaced, not merged, so leaving out dueTime clears it.
     router.dismissTo({
       pathname: '/add',
-      params: time ? { dueDate: date, dueTime: time } : { dueDate: date },
+      params: toAddSheetParams({ dueDate: date, dueTime: time ?? undefined, reminderTime }),
     });
   };
 

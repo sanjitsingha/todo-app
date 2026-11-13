@@ -33,6 +33,18 @@ export default function RootLayout() {
               headerShown: false,
             }}
           />
+          {/* Opened from the add sheet's Reminder row, on top of it: a time picker. Starts tall
+              enough for the picker and its button; drag up for full screen. */}
+          <Stack.Screen
+            name="reminder"
+            options={{
+              presentation: 'formSheet',
+              sheetAllowedDetents: [0.6, 1],
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 24,
+              headerShown: false,
+            }}
+          />
           {/* A todo's details, opened by tapping it in the list. Starts at half height; drag up
               for full screen (for a long description). */}
           <Stack.Screen

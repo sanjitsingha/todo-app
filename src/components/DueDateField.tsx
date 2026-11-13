@@ -5,18 +5,28 @@ import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '@/constants/theme';
 import { formatDueDateTime, type DateKey, type TimeKey } from '@/lib/dates';
 
+type Props = {
+  value: DateKey;
+  time?: TimeKey;
+  /** Not shown here; passed through the due-date sheet so it survives the trip. */
+  reminderTime?: TimeKey;
+};
+
 /**
  * Due date row in the add-todo sheet, e.g. "Today, 4:12 pm". Tapping it opens the due-date
  * sheet on top (src/app/due-date.tsx), which sends the pick back as the add sheet's
  * `dueDate` / `dueTime` params.
  */
-export function DueDateField({ value, time }: { value: DateKey; time?: TimeKey }) {
+export function DueDateField({ value, time, reminderTime }: Props) {
   const router = useRouter();
   const label = formatDueDateTime(value, time);
 
   const open = () => {
     Keyboard.dismiss();
-    router.push({ pathname: '/due-date', params: time ? { value, time } : { value } });
+    router.push({
+      pathname: '/due-date',
+      params: { value, ...(time ? { time } : {}), ...(reminderTime ? { reminderTime } : {}) },
+    });
   };
 
   return (

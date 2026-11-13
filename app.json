@@ -25,7 +25,16 @@
       "expo-router",
       "expo-status-bar",
       "expo-font",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      "expo-asset"
     ],
     "scheme": "todoapp",
     "experiments": {

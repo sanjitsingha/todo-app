@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import { colors } from '@/constants/theme';
-import { tick } from '@/lib/haptics';
+import { tick } from '@/lib/feedback';
 
 const ITEM_WIDTH = 52;
 
@@ -25,7 +25,7 @@ type Props = {
 
 /**
  * A swipeable row of values that works like the date strip: the one in the center is picked,
- * it grows and gets a box, and each step gives a haptic tick. Tapping a value slides it in.
+ * it grows and gets a box, and each step gives a tick. Tapping a value slides it in.
  * Horizontal on purpose: a vertical wheel would fight the sheet's own up / down drag.
  */
 export function PickerStrip({ items, value, onChange, accessibilityLabel }: Props) {

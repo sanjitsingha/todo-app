@@ -1,6 +1,14 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View, type PressableInstance } from 'react-native';
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type PressableInstance,
+} from 'react-native';
 
 import { colors } from '@/constants/theme';
 
@@ -15,9 +23,14 @@ type Props<T extends string> = {
   onChange: (value: T) => void;
   /** Read by screen readers before the current choice, e.g. "Show". */
   accessibilityLabel: string;
+  /**
+   * Which edge of the button the menu lines up with. Use "right" for a button near the right
+   * edge of the screen, so the menu opens leftward and stays on screen.
+   */
+  align?: 'left' | 'right';
 };
 
-type Anchor = { x: number; y: number; height: number };
+type Anchor = { x: number; y: number; width: number; height: number };
 
 /** A button showing the current choice. Tapping it opens a menu of options right below it. */
 export function Dropdown<T extends string>({
@@ -25,7 +38,9 @@ export function Dropdown<T extends string>({
   options,
   onChange,
   accessibilityLabel,
+  align = 'left',
 }: Props<T>) {
+  const { width: windowWidth } = useWindowDimensions();
   const triggerRef = useRef<PressableInstance>(null);
   const [isOpen, setIsOpen] = useState(false);
   // Kept after closing, so the menu stays in place while it fades out.
@@ -34,8 +49,8 @@ export function Dropdown<T extends string>({
   const selected = options.find((option) => option.value === value);
 
   const open = () => {
-    triggerRef.current?.measureInWindow((x, y, _width, height) => {
-      setAnchor({ x, y, height });
+    triggerRef.current?.measureInWindow((x, y, width, height) => {
+      setAnchor({ x, y, width, height });
       setIsOpen(true);
     });
   };
@@ -72,7 +87,15 @@ export function Dropdown<T extends string>({
       >
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close menu" />
         {anchor ? (
-          <View style={[styles.menu, { top: anchor.y + anchor.height + 6, left: anchor.x }]}>
+          <View
+            style={[
+              styles.menu,
+              { top: anchor.y + anchor.height + 6 },
+              align === 'right'
+                ? { right: windowWidth - (anchor.x + anchor.width) }
+                : { left: anchor.x },
+            ]}
+          >
             {options.map((option) => {
               const isSelected = option.value === value;
               return (

@@ -4,7 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { DUE_DATE_COLORS } from '@/constants/dueDate';
 import { PRIORITIES } from '@/constants/priority';
 import { colors } from '@/constants/theme';
-import { formatDueDateTime, getDueDateKind, isOverdue } from '@/lib/dates';
+import { formatDueDateTime, formatTime, getDueDateKind, isOverdue } from '@/lib/dates';
 import type { Todo } from '@/store/todos';
 
 /** `small` in the todo list, `medium` in the todo's details sheet. */
@@ -66,6 +66,20 @@ export function PriorityChip({ todo, size = 'small' }: ChipProps) {
     >
       <Ionicons name="flag-outline" size={sizes.icon} color={color} />
       <Text style={[sizes.text, { color }]}>{priority.label}</Text>
+    </View>
+  );
+}
+
+/** The todo's reminder time as plain gray text, or nothing if it has no reminder. */
+export function ReminderChip({ todo, size = 'small' }: ChipProps) {
+  if (!todo.reminderTime) return null;
+  const color = todo.completed ? colors.textSubtle : colors.textMuted;
+  const sizes = SIZES[size];
+
+  return (
+    <View style={[styles.item, sizes.plain]}>
+      <Ionicons name="notifications-outline" size={sizes.icon} color={color} />
+      <Text style={[sizes.text, { color }]}>{formatTime(todo.reminderTime)}</Text>
     </View>
   );
 }

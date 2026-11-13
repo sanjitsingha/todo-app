@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DueDateField } from '@/components/DueDateField';
 import { PriorityField } from '@/components/PriorityField';
+import { ReminderField } from '@/components/ReminderField';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { colors } from '@/constants/theme';
 import { isDateKey, isTimeKey } from '@/lib/dates';
@@ -53,13 +54,16 @@ export default function AddTodoScreen() {
   const [priority, setPriority] = useState<Priority>('medium');
   // Start on the day picked in the date strip, or today if that day is already past.
   const [initialDueDate] = useState(() => (selectedDate < todayKey ? todayKey : selectedDate));
-  // Set by the due-date sheet (src/app/due-date.tsx) when it closes with a pick.
-  const { dueDate: pickedDueDate, dueTime: pickedDueTime } = useLocalSearchParams<{
-    dueDate?: string;
-    dueTime?: string;
-  }>();
+  // Set by the due-date and reminder sheets (src/app/due-date.tsx, src/app/reminder.tsx) when
+  // they close with a pick. See src/lib/addSheetParams.ts.
+  const {
+    dueDate: pickedDueDate,
+    dueTime: pickedDueTime,
+    reminderTime: pickedReminderTime,
+  } = useLocalSearchParams<{ dueDate?: string; dueTime?: string; reminderTime?: string }>();
   const dueDate = isDateKey(pickedDueDate) ? pickedDueDate : initialDueDate;
   const dueTime = isTimeKey(pickedDueTime) ? pickedDueTime : undefined;
+  const reminderTime = isTimeKey(pickedReminderTime) ? pickedReminderTime : undefined;
 
   const canAdd = title.trim().length > 0;
 
@@ -70,6 +74,7 @@ export default function AddTodoScreen() {
       description: description.trim() || undefined,
       dueDate,
       dueTime,
+      reminderTime,
       priority,
     });
     // Show the todo's day, so the new todo is visible in the list right away.
@@ -120,9 +125,11 @@ export default function AddTodoScreen() {
         />
       </View>
 
-      <DueDateField value={dueDate} time={dueTime} />
+      <DueDateField value={dueDate} time={dueTime} reminderTime={reminderTime} />
 
       <PriorityField value={priority} onChange={setPriority} />
+
+      <ReminderField dueDate={dueDate} dueTime={dueTime} value={reminderTime} />
 
       <Pressable
         onPress={handleAdd}

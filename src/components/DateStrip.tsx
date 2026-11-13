@@ -11,7 +11,7 @@ import {
 
 import { colors } from '@/constants/theme';
 import { addDays, shortWeekday, toDateKey, type DateKey } from '@/lib/dates';
-import { tick } from '@/lib/haptics';
+import { tick } from '@/lib/feedback';
 
 const DAY_WIDTH = 52;
 const DAYS_BEFORE = 365;
@@ -28,7 +28,7 @@ type Props = {
 
 /**
  * Swipeable row of days. The day in the center is the selected one: it grows and gets a
- * dark circle as it slides in, with a haptic tick per day while swiping.
+ * dark circle as it slides in, with a tick per day while swiping (src/lib/feedback.ts).
  * Tapping a day, or changing `selectedDate` from outside (a todo added for another day,
  * midnight), slides the strip to that day.
  */
