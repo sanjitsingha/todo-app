@@ -25,7 +25,16 @@ function syncPlayers() {
     setAudioModeAsync({ interruptionMode: 'mixWithOthers', playsInSilentMode: false }).catch(
       () => {},
     );
-    players = Array.from({ length: PLAYER_COUNT }, () => createAudioPlayer(TICK_SOUND));
+    players = Array.from({ length: PLAYER_COUNT }, () =>
+      createAudioPlayer(TICK_SOUND, {
+        // Play from a copy on the device. In development the sound otherwise streams from the
+        // dev server (through the tunnel, even), and a rewind can wait on the network.
+        downloadFirst: true,
+        // iOS otherwise switches audio off after each tick and back on for the next, which
+        // makes every tick late.
+        keepAudioSessionActive: true,
+      }),
+    );
     nextPlayer = 0;
   } else if (!usesSound && players.length > 0) {
     players.forEach((player) => player.remove());
@@ -54,7 +63,8 @@ function lightVibration() {
     // version, and follows the phone's touch-feedback setting.
     Haptics.performAndroidHapticsAsync(Haptics.AndroidHaptics.Context_Click).catch(() => {});
   } else {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    // The crisp tick of the iOS picker wheels.
+    Haptics.selectionAsync().catch(() => {});
   }
 }
 
