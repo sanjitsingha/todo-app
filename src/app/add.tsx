@@ -103,6 +103,8 @@ export default function AddTodoScreen() {
           placeholderTextColor={colors.textMuted}
           maxLength={120}
           multiline
+          // Just the line cursor: hides the drop-shaped handle Android puts under it.
+          selectionHandleColor="transparent"
           returnKeyType="next"
           submitBehavior="submit"
           // Web ignores submitBehavior; this is what makes Enter submit there.
@@ -120,6 +122,7 @@ export default function AddTodoScreen() {
           placeholderTextColor={colors.textMuted}
           multiline
           maxLength={500}
+          selectionHandleColor="transparent"
           textAlignVertical="top"
           accessibilityLabel="Description, optional"
         />

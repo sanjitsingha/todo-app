@@ -17,7 +17,8 @@ const SelectedDateContext = createContext<SelectedDateContextValue | null>(null)
 /**
  * The day picked in the date strip, shared by the Todo screen and the Add todo sheet.
  * It remembers which day it was picked on, so when the date changes (midnight, or opening
- * the app the next day) it goes back to today.
+ * the app the next day) it goes back to today. Going to another tab puts it back on today too
+ * (src/app/(tabs)/_layout.tsx).
  */
 export function SelectedDateProvider({ children }: { children: ReactNode }) {
   const today = useToday();

@@ -9,15 +9,23 @@ import { useSyncExternalStore } from 'react';
  */
 export type FeedbackMode = 'vibrate' | 'tick' | 'tickVibrate';
 
+/** How the Todo screen shows the picked day's todos: a list, or a timeline by hour. */
+export type TodoView = 'list' | 'timeline';
+
 export type Settings = {
   feedback: FeedbackMode;
+  todoView: TodoView;
 };
 
 const STORAGE_KEY = 'settings';
-const DEFAULT_SETTINGS: Settings = { feedback: 'tickVibrate' };
+const DEFAULT_SETTINGS: Settings = { feedback: 'tickVibrate', todoView: 'list' };
 
 function isFeedbackMode(value: unknown): value is FeedbackMode {
   return value === 'vibrate' || value === 'tick' || value === 'tickVibrate';
+}
+
+function isTodoView(value: unknown): value is TodoView {
+  return value === 'list' || value === 'timeline';
 }
 
 function loadSettings(): Settings {
@@ -26,6 +34,7 @@ function loadSettings(): Settings {
     const parsed: Partial<Settings> = saved ? JSON.parse(saved) : {};
     return {
       feedback: isFeedbackMode(parsed.feedback) ? parsed.feedback : DEFAULT_SETTINGS.feedback,
+      todoView: isTodoView(parsed.todoView) ? parsed.todoView : DEFAULT_SETTINGS.todoView,
     };
   } catch (error) {
     console.warn('Could not load settings', error);

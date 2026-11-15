@@ -9,7 +9,7 @@ export type Priority = 'high' | 'medium' | 'low';
 export type Todo = {
   id: string;
   title: string;
-  /** Shown when the todo's row is expanded. */
+  /** Shown in the todo's details sheet. */
   description?: string;
   dueDate: DateKey;
   /** Time of day on the due date, if one was set. */
@@ -30,9 +30,13 @@ function isPriority(value: unknown): value is Priority {
   return value === 'high' || value === 'medium' || value === 'low';
 }
 
+/** What can be changed on a saved todo. A key set to undefined clears that value. */
+export type TodoChanges = Partial<NewTodo>;
+
 type TodosContextValue = {
   todos: Todo[];
   addTodo: (todo: NewTodo) => void;
+  updateTodo: (id: string, changes: TodoChanges) => void;
   toggleTodo: (id: string) => void;
 };
 
@@ -88,13 +92,22 @@ export function TodosProvider({ children }: { children: ReactNode }) {
     ]);
   }, []);
 
+  const updateTodo = useCallback((id: string, changes: TodoChanges) => {
+    setTodos((current) =>
+      current.map((todo) => (todo.id === id ? { ...todo, ...changes } : todo)),
+    );
+  }, []);
+
   const toggleTodo = useCallback((id: string) => {
     setTodos((current) =>
       current.map((todo) => (todo.id === id ? { ...todo, completed: !todo.completed } : todo)),
     );
   }, []);
 
-  const value = useMemo(() => ({ todos, addTodo, toggleTodo }), [todos, addTodo, toggleTodo]);
+  const value = useMemo(
+    () => ({ todos, addTodo, updateTodo, toggleTodo }),
+    [todos, addTodo, updateTodo, toggleTodo],
+  );
 
   return <TodosContext value={value}>{children}</TodosContext>;
 }

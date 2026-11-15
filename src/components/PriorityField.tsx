@@ -11,8 +11,8 @@ type Props = {
 };
 
 /**
- * Priority row in the add-todo sheet: a flag and label on the left, and the three levels
- * as pills on the right. One tap picks a level; the picked one gets its color.
+ * Priority row in the add-todo sheet and a todo's details: a flag and label on the left, and
+ * the three levels as pills on the right. One tap picks a level; the picked one gets its color.
  */
 export function PriorityField({ value, onChange }: Props) {
   const selected = PRIORITIES.find((priority) => priority.value === value) ?? PRIORITIES[1];

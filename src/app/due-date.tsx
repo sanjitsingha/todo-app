@@ -18,12 +18,14 @@ import { colors } from '@/constants/theme';
 import { toAddSheetParams } from '@/lib/addSheetParams';
 import { defaultTime, isDateKey, isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
+import { useTodos } from '@/store/todos';
 
 /**
  * Sheet for picking a todo's due date and, optionally, a time. Opened from the add-todo sheet
- * (see src/app/_layout.tsx); opens part way up and can be dragged to full screen.
- * Gets the current pick as `value` / `time` and hands the new one back as the add sheet's
- * `dueDate` / `dueTime` params.
+ * or a todo's details sheet (see src/app/_layout.tsx); opens part way up and can be dragged to
+ * full screen. Gets the current pick as `value` / `time`. From the add sheet, it hands the new
+ * one back as the add sheet's `dueDate` / `dueTime` params. From the details sheet (`todoId`
+ * set), it saves it on that todo and goes back.
  *
  * Tapping a day closes the sheet right away, taking the time along if one is set.
  * "Done" (there once a time is involved) keeps the day and saves the time.
@@ -32,7 +34,13 @@ export default function DueDateScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { today, todayKey } = useSelectedDate();
-  const params = useLocalSearchParams<{ value?: string; time?: string; reminderTime?: string }>();
+  const { updateTodo } = useTodos();
+  const params = useLocalSearchParams<{
+    value?: string;
+    time?: string;
+    reminderTime?: string;
+    todoId?: string;
+  }>();
   const current = isDateKey(params.value) && params.value >= todayKey ? params.value : todayKey;
   // Not changed here; handed back as is (see src/lib/addSheetParams.ts).
   const reminderTime = isTimeKey(params.reminderTime) ? params.reminderTime : undefined;
@@ -44,6 +52,12 @@ export default function DueDateScreen() {
   const revealPicker = useRef(false);
 
   const finish = (date: DateKey) => {
+    if (params.todoId) {
+      // A saved todo: the reminder is a time on the due date, so it moves along with it.
+      updateTodo(params.todoId, { dueDate: date, dueTime: time ?? undefined });
+      router.back();
+      return;
+    }
     // The add sheet's params are replaced, not merged, so leaving out dueTime clears it.
     router.dismissTo({
       pathname: '/add',

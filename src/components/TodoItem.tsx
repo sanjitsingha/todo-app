@@ -2,27 +2,23 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Collapsible, ExpandChevron, useExpandable } from '@/components/Collapsible';
 import { DueDateChip, dueLabel, PriorityChip, priorityOf } from '@/components/TodoChips';
 import { colors } from '@/constants/theme';
 import { useTodos, type Todo } from '@/store/todos';
 
 /**
  * One todo in the list: rounded-square checkbox, title, due date (and time), and priority chip.
- * Tapping the row opens the todo's details sheet (src/app/todo/[id].tsx). Todos with a
- * description get a chevron that smoothly expands the row to show it between the title and
- * the date.
+ * Tapping the row opens the todo's details sheet (src/app/todo/[id].tsx), which also shows the
+ * description.
  */
 export function TodoItem({ todo }: { todo: Todo }) {
   const router = useRouter();
   const { toggleTodo } = useTodos();
-  const description = todo.description?.trim();
-  const { expanded, toggle: toggleExpanded, progress } = useExpandable();
 
   return (
     <View style={styles.row}>
-      {/* The whole row opens the details. It sits underneath, so the checkbox and chevron on
-          top keep their own taps, and the press feedback covers the full row. */}
+      {/* The whole row opens the details. It sits underneath, so the checkbox on top keeps its
+          own tap, and the press feedback covers the full row. */}
       <Pressable
         onPress={() => router.push({ pathname: '/todo/[id]', params: { id: todo.id } })}
         style={({ pressed }) => [
@@ -46,7 +42,7 @@ export function TodoItem({ todo }: { todo: Todo }) {
         accessibilityLabel={todo.title}
       >
         <View style={[styles.checkbox, todo.completed && styles.checkboxChecked]}>
-          {todo.completed ? <Ionicons name="checkmark" size={14} color={colors.onPrimary} /> : null}
+          {todo.completed ? <Ionicons name="checkmark" size={13} color={colors.onPrimary} /> : null}
         </View>
       </Pressable>
 
@@ -57,55 +53,56 @@ export function TodoItem({ todo }: { todo: Todo }) {
           {todo.title}
         </Text>
 
-        {description ? (
-          <Collapsible progress={progress} expanded={expanded} contentStyle={styles.descriptionContent}>
-            <Text style={styles.description}>{description}</Text>
-          </Collapsible>
-        ) : null}
-
         {/* Due date, then the priority chip. Wraps to a second line if it runs out of room. */}
         <View style={styles.meta}>
           <DueDateChip todo={todo} />
           <PriorityChip todo={todo} />
         </View>
       </View>
-
-      {description ? (
-        <Pressable
-          onPress={toggleExpanded}
-          hitSlop={12}
-          style={styles.chevron}
-          accessibilityRole="button"
-          accessibilityLabel={expanded ? 'Hide description' : 'Show description'}
-          accessibilityState={{ expanded }}
-        >
-          <ExpandChevron progress={progress} size={20} color={colors.textMuted} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
 
+// The same on every side, so the gap to the checkbox is equal from the top and the left.
+const CARD_PADDING = 8;
+const TITLE_LINE_HEIGHT = 24;
+// A rounded square, not a circle.
+const CHECKBOX_SIZE = 18;
+const CHECKBOX_RADIUS = 5;
+// Centers the checkbox on the title's first line.
+const CHECKBOX_MARGIN = (TITLE_LINE_HEIGHT - CHECKBOX_SIZE) / 2;
+// Nested corners: outer radius = inner radius + the gap between them. The card's corner is
+// worked out from the checkbox's, so the two curves run parallel.
+const CARD_RADIUS = CHECKBOX_RADIUS + CARD_PADDING + CHECKBOX_MARGIN;
+
 const styles = StyleSheet.create({
-  // Plain row: no box, border, or divider. Spacing alone separates todos.
+  // A very light gray card (the same gray as behind the date strip), lined up with the 16px
+  // edges of the rest of the screen.
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    // Between the checkbox and the title.
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: CARD_PADDING,
+    borderRadius: CARD_RADIUS,
+    backgroundColor: colors.background,
+    // Keeps the Android ripple inside the rounded corners.
+    overflow: 'hidden',
   },
   rowPressed: {
     backgroundColor: colors.inputBackground,
   },
-  // Rounded square. 20px plus 2px margin each side = 24px, the title's line height.
   checkbox: {
-    width: 20,
-    height: 20,
-    margin: 2,
-    borderRadius: 5,
-    borderWidth: 2,
+    width: CHECKBOX_SIZE,
+    height: CHECKBOX_SIZE,
+    margin: CHECKBOX_MARGIN,
+    borderRadius: CHECKBOX_RADIUS,
+    borderWidth: 1.5,
     borderColor: colors.iconInactive,
+    // White, so the empty box stands out on the gray card. Checked, it turns yellow.
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -119,8 +116,8 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    // Matches the checkbox height, so the checkbox lines up with the first line of the title.
-    lineHeight: 24,
+    // The checkbox is centered on this line (see CHECKBOX_MARGIN).
+    lineHeight: TITLE_LINE_HEIGHT,
     fontWeight: '600',
     color: colors.text,
   },
@@ -128,25 +125,11 @@ const styles = StyleSheet.create({
     color: colors.textSubtle,
     textDecorationLine: 'line-through',
   },
-  descriptionContent: {
-    paddingTop: 4,
-    paddingBottom: 4,
-  },
-  description: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textMuted,
-  },
   meta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: 8,
     marginTop: 4,
-  },
-  // Same height as the title's first line, so the chevron sits level with it.
-  chevron: {
-    height: 24,
-    justifyContent: 'center',
   },
 });

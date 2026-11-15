@@ -2,7 +2,15 @@ import * as Notifications from 'expo-notifications';
 import { AndroidImportance } from 'expo-notifications';
 import { Alert, Linking, Platform } from 'react-native';
 
-import { formatTime, fromDateKey, parseTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
+import {
+  formatTime,
+  fromDateKey,
+  MINUTES_PER_DAY,
+  parseTimeKey,
+  toDateKey,
+  type DateKey,
+  type TimeKey,
+} from '@/lib/dates';
 import type { Todo } from '@/store/todos';
 
 const CHANNEL_ID = 'reminders';
@@ -31,6 +39,18 @@ export function reminderDate(dueDate: DateKey, reminderTime: TimeKey): Date {
 
 export function isReminderPast(dueDate: DateKey, reminderTime: TimeKey, now = Date.now()) {
   return reminderDate(dueDate, reminderTime).getTime() <= now;
+}
+
+/**
+ * The earliest reminder that can still be set on `dueDate`, in minutes since midnight: the
+ * next minute if it's today, 0 for a day still ahead, and MINUTES_PER_DAY (none left) for a
+ * day that's over. Matches isReminderPast: the current minute counts as passed.
+ */
+export function earliestReminderMinute(dueDate: DateKey, now = new Date()): number {
+  const todayKey = toDateKey(now);
+  if (dueDate > todayKey) return 0;
+  if (dueDate < todayKey) return MINUTES_PER_DAY;
+  return now.getHours() * 60 + now.getMinutes() + 1;
 }
 
 let channelReady: Promise<boolean> | null = null;
@@ -89,6 +109,11 @@ export async function ensureReminderPermission(): Promise<boolean> {
 
 let queue: Promise<void> = Promise.resolve();
 
+/** The notification's text under the todo's name. It goes off on the due date, so "today". */
+function reminderBody(todo: Todo): string {
+  return todo.dueTime ? `Due today at ${formatTime(todo.dueTime)}` : 'Due today';
+}
+
 /**
  * Makes the scheduled notifications match the todos: one for each unfinished todo whose
  * reminder is still ahead, none for anything else (finished, removed, or past). Called whenever
@@ -114,7 +139,12 @@ async function sync(todos: readonly Todo[]) {
   const scheduled = await Notifications.getAllScheduledNotificationsAsync();
   for (const request of scheduled) {
     const match = wanted.get(request.identifier);
-    if (match && request.content.data?.at === match.at && request.content.title === match.todo.title) {
+    if (
+      match &&
+      request.content.data?.at === match.at &&
+      request.content.title === match.todo.title &&
+      request.content.body === reminderBody(match.todo)
+    ) {
       wanted.delete(request.identifier); // Already scheduled as it should be.
     } else {
       await Notifications.cancelScheduledNotificationAsync(request.identifier);
@@ -132,8 +162,7 @@ async function sync(todos: readonly Todo[]) {
       identifier: id,
       content: {
         title: todo.title,
-        // A reminder always goes off on the due date, so "today" is right when it shows.
-        body: todo.dueTime ? `Due today at ${formatTime(todo.dueTime)}` : 'Due today',
+        body: reminderBody(todo),
         data: { todoId: id, at },
       },
       trigger: {

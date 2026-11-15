@@ -6,41 +6,66 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { TimePicker } from '@/components/TimePicker';
 import { colors } from '@/constants/theme';
+import { useNow } from '@/hooks/useNow';
 import { toAddSheetParams } from '@/lib/addSheetParams';
 import {
   defaultTime,
   formatDayPhrase,
   formatTime,
+  fromDayMinutes,
   isDateKey,
   isTimeKey,
+  MINUTES_PER_DAY,
+  toDayMinutes,
   type TimeKey,
 } from '@/lib/dates';
-import { ensureReminderPermission, isReminderPast } from '@/lib/reminders';
+import { earliestReminderMinute, ensureReminderPermission } from '@/lib/reminders';
 import { useSelectedDate } from '@/store/selectedDate';
+import { useTodos } from '@/store/todos';
 
 /**
  * Sheet for picking when to get a reminder notification: a time on the todo's due date.
- * Opened from the add-todo sheet (see src/app/_layout.tsx) with the due date and the current
- * reminder (`value`), and hands the pick back as the add sheet's `reminderTime` param.
+ * Opened from the add-todo sheet or a todo's details sheet (see src/app/_layout.tsx) with the
+ * due date and the current reminder (`value`). From the add sheet, it hands the pick back as
+ * the add sheet's `reminderTime` param. From the details sheet (`todoId` set), it saves it on
+ * that todo and goes back.
  * Setting a reminder asks for notification permission, the first time.
+ * Times that have already passed are faded in the picker and can't be picked.
  */
 export default function ReminderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { today, todayKey } = useSelectedDate();
-  const params = useLocalSearchParams<{ dueDate?: string; dueTime?: string; value?: string }>();
+  const { todayKey } = useSelectedDate();
+  const now = useNow();
+  const { updateTodo } = useTodos();
+  const params = useLocalSearchParams<{
+    dueDate?: string;
+    dueTime?: string;
+    value?: string;
+    todoId?: string;
+  }>();
   const dueDate = isDateKey(params.dueDate) ? params.dueDate : todayKey;
   const dueTime = isTimeKey(params.dueTime) ? params.dueTime : undefined;
   const [initialValue] = useState(() => (isTimeKey(params.value) ? params.value : undefined));
   // Starts on the current reminder, else the due time, else the next whole hour (or 9:00 am).
-  const [time, setTime] = useState<TimeKey>(
-    () => initialValue ?? dueTime ?? defaultTime(dueDate, today),
+  const [picked, setPicked] = useState<TimeKey>(
+    () => initialValue ?? dueTime ?? defaultTime(dueDate, now),
   );
   const [saving, setSaving] = useState(false);
 
-  const isPast = isReminderPast(dueDate, time);
+  // Nothing before the next minute can be picked. A time that's already passed (or passes
+  // while the sheet is open) moves up to the earliest one left.
+  const earliest = earliestReminderMinute(dueDate, now);
+  const noneLeft = earliest >= MINUTES_PER_DAY;
+  const time =
+    noneLeft || toDayMinutes(picked) >= earliest ? picked : fromDayMinutes(earliest);
 
   const finish = (reminderTime?: TimeKey) => {
+    if (params.todoId) {
+      updateTodo(params.todoId, { reminderTime });
+      router.back();
+      return;
+    }
     router.dismissTo({
       pathname: '/add',
       params: toAddSheetParams({ dueDate, dueTime, reminderTime }),
@@ -48,7 +73,7 @@ export default function ReminderScreen() {
   };
 
   const save = async () => {
-    if (isPast || saving) return;
+    if (noneLeft || saving) return;
     setSaving(true);
     // Kept even if notifications aren't allowed: it's scheduled once they are.
     await ensureReminderPermission();
@@ -69,27 +94,24 @@ export default function ReminderScreen() {
       <Text style={styles.heading} accessibilityRole="header">
         Reminder
       </Text>
-      <Text
-        style={[styles.summary, isPast && styles.summaryPast]}
-        accessibilityLiveRegion="polite"
-      >
-        {isPast
-          ? 'That time has already passed. Pick a later one.'
-          : `You’ll get a notification ${formatDayPhrase(dueDate, today)} at ${formatTime(time)}.`}
+      <Text style={styles.summary} accessibilityLiveRegion="polite">
+        {noneLeft
+          ? 'This day is over. Pick a later due date to set a reminder.'
+          : `You’ll get a notification ${formatDayPhrase(dueDate, now)} at ${formatTime(time)}.`}
       </Text>
 
-      <TimePicker value={time} onChange={setTime} />
+      <TimePicker value={time} onChange={setPicked} earliest={earliest} />
 
       <Pressable
         onPress={save}
-        disabled={isPast || saving}
+        disabled={noneLeft || saving}
         style={({ pressed }) => [
           styles.done,
-          (isPast || saving) && styles.doneDisabled,
+          (noneLeft || saving) && styles.doneDisabled,
           pressed && styles.donePressed,
         ]}
         accessibilityRole="button"
-        accessibilityState={{ disabled: isPast || saving }}
+        accessibilityState={{ disabled: noneLeft || saving }}
       >
         <Text style={styles.doneText}>Set reminder</Text>
       </Pressable>
@@ -131,9 +153,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: colors.textMuted,
-  },
-  summaryPast: {
-    color: colors.danger,
   },
   // Same as the due-date sheet's "Done" button.
   done: {

@@ -51,11 +51,14 @@ export function DueDateChip({ todo, size = 'small' }: ChipProps) {
   );
 }
 
-/** The todo's priority as a tinted pill. Finished todos keep the pill, but in gray. */
+/**
+ * The todo's priority as a tinted pill. Finished todos keep the pill, but in gray: a shade
+ * darker than the todo cards, so it still shows on them.
+ */
 export function PriorityChip({ todo, size = 'small' }: ChipProps) {
   const priority = priorityOf(todo);
   const color = todo.completed ? colors.textSubtle : priority.color;
-  const background = todo.completed ? colors.inputBackground : priority.background;
+  const background = todo.completed ? colors.inkSoft : priority.background;
   const sizes = SIZES[size];
 
   return (
@@ -94,11 +97,11 @@ const styles = StyleSheet.create({
 // Pill-shaped chips: a radius bigger than half the height rounds the ends fully.
 const SIZES = {
   small: {
-    icon: 12,
+    icon: 10,
     ...StyleSheet.create({
-      chip: { gap: 4, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
-      plain: { gap: 6 },
-      text: { fontSize: 12, fontWeight: '500' },
+      chip: { gap: 3, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 },
+      plain: { gap: 4 },
+      text: { fontSize: 11, fontWeight: '500' },
     }),
   },
   medium: {

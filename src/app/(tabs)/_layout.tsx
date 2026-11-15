@@ -1,13 +1,33 @@
 import { Tabs } from 'expo-router';
+import type { BottomTabBarProps } from 'expo-router/tabs';
+import { useEffect } from 'react';
 
 import { BackButton } from '@/components/BackButton';
 import { BottomNavBar } from '@/components/BottomNavBar';
 import { colors } from '@/constants/theme';
+import { useSelectedDate } from '@/store/selectedDate';
+
+/**
+ * The bottom navbar, plus a rule for the tabs as a whole: going to another tab (Settings)
+ * puts the date strip back on today, so the Todo tab always comes back to today. Sheets opened
+ * on top of the Todo tab (add, todo details) aren't tabs, so they keep the day you were on.
+ * It's done on the way out, so the strip is already on today when the Todo tab shows again.
+ */
+function TabBar(props: BottomTabBarProps) {
+  const { selectDate, todayKey } = useSelectedDate();
+  const activeTab = props.state.routes[props.state.index]?.name;
+
+  useEffect(() => {
+    if (activeTab !== 'index') selectDate(todayKey);
+  }, [activeTab, selectDate, todayKey]);
+
+  return <BottomNavBar {...props} />;
+}
 
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <BottomNavBar {...props} />}
+      tabBar={(props) => <TabBar {...props} />}
       screenOptions={{ sceneStyle: { backgroundColor: colors.background } }}
     >
       {/* The Todo screen draws its own date header (src/components/DateHeader.tsx). */}

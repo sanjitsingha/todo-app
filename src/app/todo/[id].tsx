@@ -1,28 +1,52 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, type ComponentProps, type ReactNode } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PriorityField } from '@/components/PriorityField';
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { DueDateChip, PriorityChip, ReminderChip } from '@/components/TodoChips';
+import { DueDateChip, dueLabel, ReminderChip } from '@/components/TodoChips';
 import { colors } from '@/constants/theme';
+import { formatTime } from '@/lib/dates';
 import { useTodos, type Todo } from '@/store/todos';
 
 /**
  * Bottom sheet with a todo's details, opened by tapping it in the list (presented as a form
- * sheet, see src/app/_layout.tsx). Shows the full name and description, the due date and
- * priority, and a button to mark it done (or not done), which also closes the sheet.
+ * sheet, see src/app/_layout.tsx). Everything in it can be changed in place, with no separate
+ * edit mode: tap the name or description to type, tap Due date or Reminder for their sheets
+ * (which save to this todo and come back here), or tap a priority. The button at the bottom
+ * marks it done (or not done) and closes the sheet.
  */
 export default function TodoDetailsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { todos, toggleTodo } = useTodos();
+  const { todos, updateTodo, toggleTodo } = useTodos();
   // While the sheet slides away after the button is pressed, it keeps showing the todo as it
   // was, instead of flipping to the new state on the way out.
   const [closingWith, setClosingWith] = useState<Todo | null>(null);
   const todo = closingWith ?? todos.find((item) => item.id === id);
+
+  // A name can't be emptied: clearing it and leaving the field puts the old one back.
+  const title = useDraft(todo?.title ?? '', (text) => {
+    const next = text.replace(/\s*\n\s*/g, ' ').trim();
+    if (todo && next && next !== todo.title) updateTodo(todo.id, { title: next });
+  });
+  const savedDescription = todo?.description?.trim() ?? '';
+  const description = useDraft(savedDescription, (text) => {
+    const next = text.trim();
+    if (todo && next !== savedDescription) updateTodo(todo.id, { description: next || undefined });
+  });
 
   // iOS already pads the sheet for the home indicator; Android needs room for the nav bar.
   const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 16) : 24;
@@ -36,12 +60,35 @@ export default function TodoDetailsScreen() {
     );
   }
 
-  const description = todo.description?.trim();
-
   const toggle = () => {
     setClosingWith(todo);
     toggleTodo(todo.id);
     router.back();
+  };
+
+  const openDueDate = () => {
+    Keyboard.dismiss();
+    router.push({
+      pathname: '/due-date',
+      params: {
+        todoId: todo.id,
+        value: todo.dueDate,
+        ...(todo.dueTime ? { time: todo.dueTime } : {}),
+      },
+    });
+  };
+
+  const openReminder = () => {
+    Keyboard.dismiss();
+    router.push({
+      pathname: '/reminder',
+      params: {
+        todoId: todo.id,
+        dueDate: todo.dueDate,
+        ...(todo.dueTime ? { dueTime: todo.dueTime } : {}),
+        ...(todo.reminderTime ? { value: todo.reminderTime } : {}),
+      },
+    });
   };
 
   return (
@@ -50,30 +97,73 @@ export default function TodoDetailsScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       // Lets the Android sheet expand first and then scroll, instead of fighting over the drag.
       nestedScrollEnabled
+      // With the keyboard up, a tap on a row or button works right away, instead of only
+      // closing the keyboard.
+      keyboardShouldPersistTaps="handled"
     >
       <SheetGrabber />
 
-      <Text
-        style={[styles.title, todo.completed && styles.titleCompleted]}
-        accessibilityRole="header"
-      >
-        {todo.title}
-      </Text>
-      {description ? <Text style={styles.description}>{description}</Text> : null}
+      {/* Looks like plain text until tapped. Multiline only so a long name wraps: Enter
+          finishes editing, and pasted line breaks become spaces. */}
+      <TextInput
+        style={[styles.input, styles.title, todo.completed && styles.titleCompleted]}
+        {...title}
+        placeholder="Todo name"
+        placeholderTextColor={colors.textMuted}
+        maxLength={120}
+        multiline
+        // Just the line cursor: hides the drop-shaped handle Android puts under it.
+        selectionHandleColor="transparent"
+        returnKeyType="done"
+        submitBehavior="blurAndSubmit"
+        // Web ignores submitBehavior; this is what makes Enter finish there.
+        blurOnSubmit={Platform.OS === 'web'}
+        accessibilityLabel="Todo name"
+        accessibilityHint="Edits the name"
+      />
+      <TextInput
+        style={[styles.input, styles.description]}
+        {...description}
+        placeholder="Add description"
+        placeholderTextColor={colors.iconInactive}
+        maxLength={500}
+        multiline
+        selectionHandleColor="transparent"
+        textAlignVertical="top"
+        accessibilityLabel="Description"
+        accessibilityHint="Edits the description"
+      />
 
       <View style={styles.divider} />
 
-      <DetailRow icon="calendar-outline" label="Due date">
+      <DetailRow
+        icon="calendar-outline"
+        label="Due date"
+        onPress={openDueDate}
+        accessibilityLabel={`Due date, ${dueLabel(todo)}`}
+        accessibilityHint="Opens date options, a calendar, and a time picker"
+      >
         <DueDateChip todo={todo} size="medium" />
       </DetailRow>
-      <DetailRow icon="flag-outline" label="Priority">
-        <PriorityChip todo={todo} size="medium" />
-      </DetailRow>
-      {todo.reminderTime ? (
-        <DetailRow icon="notifications-outline" label="Reminder">
+      <PriorityField
+        value={todo.priority}
+        onChange={(priority) => updateTodo(todo.id, { priority })}
+      />
+      <DetailRow
+        icon="notifications-outline"
+        label="Reminder"
+        onPress={openReminder}
+        accessibilityLabel={
+          todo.reminderTime ? `Reminder, ${formatTime(todo.reminderTime)}` : 'Reminder, none'
+        }
+        accessibilityHint="Opens a time picker for a reminder notification"
+      >
+        {todo.reminderTime ? (
           <ReminderChip todo={todo} size="medium" />
-        </DetailRow>
-      ) : null}
+        ) : (
+          <Text style={styles.rowEmpty}>Add time</Text>
+        )}
+      </DetailRow>
 
       <Pressable
         onPress={toggle}
@@ -97,24 +187,79 @@ export default function TodoDetailsScreen() {
   );
 }
 
-/** A label with an icon on the left and a value on the right, like the add sheet's rows. */
+/**
+ * Props for a text field that edits `saved` in place. Typing changes only the field; the text
+ * is saved once editing ends (the field loses focus, or the sheet closes mid-edit), so the
+ * todos aren't stored and their reminders re-synced on every keystroke.
+ */
+function useDraft(saved: string, save: (text: string) => void) {
+  const [draft, setDraft] = useState<string | null>(null);
+  // The same draft, readable when the sheet closes.
+  const pending = useRef<string | null>(null);
+  const latestSave = useRef(save);
+  useEffect(() => {
+    latestSave.current = save;
+  });
+
+  // Closed while still editing (swiped down, or "Mark as done"): save what was typed.
+  useEffect(
+    () => () => {
+      if (pending.current !== null) latestSave.current(pending.current);
+    },
+    [],
+  );
+
+  return {
+    value: draft ?? saved,
+    onChangeText: (text: string) => {
+      pending.current = text;
+      setDraft(text);
+    },
+    onBlur: () => {
+      if (pending.current !== null) latestSave.current(pending.current);
+      pending.current = null;
+      setDraft(null);
+    },
+  };
+}
+
+/**
+ * A label with an icon on the left and a value on the right, like the add sheet's rows.
+ * Tapping it opens the sheet that changes the value; the chevron says so.
+ */
 function DetailRow({
   icon,
   label,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
   children,
 }: {
   icon: ComponentProps<typeof Ionicons>['name'];
   label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+  accessibilityHint: string;
   children: ReactNode;
 }) {
   return (
-    <View style={styles.row}>
+    <Pressable
+      onPress={onPress}
+      style={styles.row}
+      android_ripple={{ color: colors.ripple }}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
+    >
       <View style={styles.rowLabel}>
         <Ionicons name={icon} size={20} color={colors.ink} />
         <Text style={styles.rowLabelText}>{label}</Text>
       </View>
-      {children}
-    </View>
+      <View style={styles.rowValue}>
+        {children}
+        <Ionicons name="chevron-forward" size={18} color={colors.iconInactive} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -129,9 +274,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 10 : 20,
   },
+  // Plain field: no box or underline, so it reads as text until tapped.
+  input: {
+    paddingHorizontal: 0,
+    // Hides the browser's focus box on web (phones don't draw one).
+    // A solid style is needed: the browser's default "auto" style ignores the width.
+    outlineStyle: 'solid',
+    outlineWidth: 0,
+  },
   // Same as the name in the add sheet.
   title: {
     paddingTop: 8,
+    paddingBottom: 4,
     fontSize: 22,
     lineHeight: 28,
     fontWeight: '700',
@@ -142,7 +296,8 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   description: {
-    marginTop: 8,
+    paddingTop: 4,
+    paddingBottom: 4,
     fontSize: 16,
     lineHeight: 22,
     color: colors.textMuted,
@@ -158,6 +313,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
+    // Keeps the Android ripple inside the row.
+    overflow: 'hidden',
   },
   rowLabel: {
     flexDirection: 'row',
@@ -167,6 +324,18 @@ const styles = StyleSheet.create({
   rowLabelText: {
     fontSize: 16,
     color: colors.text,
+  },
+  rowValue: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  // Same as the add sheet's empty Reminder row.
+  rowEmpty: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.textMuted,
   },
   // Same size as the "Add todo" button.
   button: {

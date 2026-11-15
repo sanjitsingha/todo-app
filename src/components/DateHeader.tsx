@@ -1,21 +1,33 @@
+import type { ReactNode } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/theme';
-import { getHeaderDateParts } from '@/lib/dates';
+import { formatLongDate, shortWeekday, toDateKey } from '@/lib/dates';
 
-/** Screen header: big short weekday on the left, month + day and year on the right. */
-export function DateHeader({ date }: { date: Date }) {
+type Props = {
+  date: Date;
+  /** Shown on the right, level with the weekday, e.g. the timeline button. */
+  action?: ReactNode;
+};
+
+/**
+ * Screen header: the picked day's short weekday, big, with an optional button on the right.
+ * Screen readers get the full date.
+ */
+export function DateHeader({ date, action }: Props) {
   const insets = useSafeAreaInsets();
-  const { weekday, monthDay, year } = getHeaderDateParts(date);
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 36 }]} accessibilityRole="header">
-      <Text style={styles.weekday}>{weekday}</Text>
-      <View>
-        <Text style={styles.date}>{monthDay}</Text>
-        <Text style={styles.date}>{year}</Text>
-      </View>
+    <View style={[styles.container, { paddingTop: insets.top + 36 }]}>
+      <Text
+        style={styles.weekday}
+        accessibilityRole="header"
+        accessibilityLabel={formatLongDate(toDateKey(date))}
+      >
+        {shortWeekday(date)}
+      </Text>
+      {action}
     </View>
   );
 }
@@ -34,12 +46,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: -1,
     color: colors.text,
-  },
-  date: {
-    fontSize: 15,
-    lineHeight: 19,
-    fontWeight: '500',
-    color: colors.textSubtle,
-    textAlign: 'right',
   },
 });

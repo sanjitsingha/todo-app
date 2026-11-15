@@ -21,6 +21,8 @@ type Props = {
   onChange: (index: number) => void;
   /** Read out by screen readers, e.g. "Hour". */
   accessibilityLabel: string;
+  /** Values that can't be picked, e.g. times already passed. They're faded and skipped. */
+  isDisabled?: (index: number) => boolean;
 };
 
 /**
@@ -29,7 +31,7 @@ type Props = {
  * value slides it in. Horizontal on purpose: a vertical wheel would fight the sheet's own
  * up / down drag.
  */
-export function PickerStrip({ items, value, onChange, accessibilityLabel }: Props) {
+export function PickerStrip({ items, value, onChange, accessibilityLabel, isDisabled }: Props) {
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [width, setWidth] = useState(0);
 
@@ -40,7 +42,15 @@ export function PickerStrip({ items, value, onChange, accessibilityLabel }: Prop
     value,
     onChange,
     scrollTo: (x, animated) => scrollRef.current?.scrollTo({ x, animated }),
+    isDisabled,
   });
+
+  // Screen readers step to the next value that can be picked.
+  const stepBy = (direction: 1 | -1) => {
+    for (let index = value + direction; index >= 0 && index < items.length; index += direction) {
+      if (!isDisabled?.(index)) return pick(index);
+    }
+  };
 
   // Only where the strip starts. iOS jumps to a new contentOffset whenever it changes, which
   // would cut off the slide to a tapped value.
@@ -62,7 +72,7 @@ export function PickerStrip({ items, value, onChange, accessibilityLabel }: Prop
       accessibilityValue={{ text: items[value] }}
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(event) =>
-        pick(value + (event.nativeEvent.actionName === 'increment' ? 1 : -1))
+        stepBy(event.nativeEvent.actionName === 'increment' ? 1 : -1)
       }
     >
       {width > 0 ? (
@@ -85,6 +95,7 @@ export function PickerStrip({ items, value, onChange, accessibilityLabel }: Prop
               step={step}
               scrollX={scrollX}
               onPress={pick}
+              disabled={isDisabled?.(index) ?? false}
             />
           ))}
         </Animated.ScrollView>
@@ -100,6 +111,7 @@ type StripItemProps = {
   step: number;
   scrollX: Animated.Value;
   onPress: (index: number) => void;
+  disabled: boolean;
 };
 
 const StripItem = memo(function StripItem({
@@ -108,6 +120,7 @@ const StripItem = memo(function StripItem({
   step,
   scrollX,
   onPress,
+  disabled,
 }: StripItemProps) {
   // How close this value is to the center: 0 = one step away (or more), 1 = centered.
   const animated = useMemo(() => {
@@ -123,7 +136,11 @@ const StripItem = memo(function StripItem({
   }, [scrollX, index, step]);
 
   return (
-    <Pressable onPress={() => onPress(index)} style={[styles.item, { width: step }]}>
+    <Pressable
+      onPress={() => onPress(index)}
+      disabled={disabled}
+      style={[styles.item, { width: step }, disabled && styles.itemDisabled]}
+    >
       <Animated.View
         style={[
           styles.box,
@@ -151,6 +168,10 @@ const styles = StyleSheet.create({
     height: 52,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Faded well below the other values, so it reads as out of reach.
+  itemDisabled: {
+    opacity: 0.35,
   },
   // Same box as the selected day in the date strip.
   box: {

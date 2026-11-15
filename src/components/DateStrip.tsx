@@ -4,7 +4,6 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -13,7 +12,8 @@ import { colors } from '@/constants/theme';
 import { useSnapStrip } from '@/hooks/useSnapStrip';
 import { addDays, shortWeekday, toDateKey, type DateKey } from '@/lib/dates';
 
-const DAY_WIDTH = 52;
+// A week across the screen, so the picked day sits in the middle with three on each side.
+const VISIBLE_DAYS = 7;
 const DAYS_BEFORE = 365;
 // Due dates can be set far ahead, so the strip reaches 5 years forward.
 const DAYS_AFTER = 365 * 5;
@@ -27,8 +27,9 @@ type Props = {
 };
 
 /**
- * Swipeable row of days. The day in the center is the selected one: it grows and gets a
- * dark circle as it slides in, with a tick per day while swiping (src/hooks/useSnapStrip.ts).
+ * Swipeable row of days, a week wide: the weekday ("Mon") over the date. The day in the center
+ * is the selected one: as it slides in, its date gets a soft gray box and its weekday turns
+ * dark and bold, with a tick per day while swiping (src/hooks/useSnapStrip.ts).
  * The day is selected once the strip comes to rest. Tapping a day, or changing `selectedDate`
  * from outside (a todo added for another day, midnight), slides the strip to that day.
  */
@@ -49,7 +50,7 @@ export const DateStrip = memo(function DateStrip({ today, selectedDate, onSelect
 
   const { step, scrollX, scrollProps, pick } = useSnapStrip({
     count: days.length,
-    stepWidth: DAY_WIDTH,
+    stepWidth: width / VISIBLE_DAYS,
     initialIndex,
     value: selectedIndex,
     onChange: (index) => onSelectDate(toDateKey(days[index])),
@@ -120,63 +121,63 @@ const DayItem = memo(function DayItem({
   onPress,
 }: DayItemProps) {
   // How close this day is to the center: 0 = one day away (or more), 1 = centered.
+  // Text weight and color can't run on the native driver, so the plain and picked looks are
+  // two copies of the text crossfading.
   const animated = useMemo(() => {
     const inputRange = [(index - 1) * step, index * step, (index + 1) * step];
     const between = (from: number, to: number) =>
       scrollX.interpolate({ inputRange, outputRange: [from, to, from], extrapolate: 'clamp' });
     return {
-      circleOpacity: between(0, 1),
-      circleScale: between(0.8, 1),
-      labelScale: between(0.85, 1.15),
-      // The label fades from dark to white as the circle fills in behind it. (Text color
-      // can't run on the native driver, so it's two copies crossfading.)
-      darkLabelOpacity: between(0.3, 0),
-      lightLabelOpacity: between(0, 1),
+      boxOpacity: between(0, 1),
+      boxScale: between(0.8, 1),
+      plainOpacity: between(1, 0),
+      pickedOpacity: between(0, 1),
     };
   }, [scrollX, index, step]);
 
   const weekday = shortWeekday(date);
-
-  const label = (onCircle: boolean) => (
-    <Animated.View
-      style={[
-        styles.label,
-        {
-          opacity: onCircle ? animated.lightLabelOpacity : animated.darkLabelOpacity,
-          transform: [{ scale: animated.labelScale }],
-        },
-      ]}
-    >
-      <Text style={[styles.number, onCircle && styles.textOnCircle]}>{date.getDate()}</Text>
-      <Text style={[styles.weekday, onCircle && styles.textOnCircle]}>
-        {weekday.toUpperCase()}
-      </Text>
-    </Animated.View>
-  );
+  const day = date.getDate();
 
   return (
     <Pressable
       onPress={() => onPress(index)}
       style={[styles.day, { width: step }]}
       accessibilityRole="button"
-      accessibilityLabel={`${weekday} ${date.getDate()}${isToday ? ', today' : ''}`}
+      accessibilityLabel={`${weekday} ${day}${isToday ? ', today' : ''}`}
     >
-      <View style={styles.body}>
+      <View style={styles.weekdayRow}>
+        <Animated.Text style={[styles.weekday, { opacity: animated.plainOpacity }]}>
+          {weekday}
+        </Animated.Text>
+        <Animated.Text
+          style={[styles.weekday, styles.weekdayPicked, { opacity: animated.pickedOpacity }]}
+        >
+          {weekday}
+        </Animated.Text>
+      </View>
+
+      <View style={styles.dateBox}>
         <Animated.View
           style={[
-            styles.circle,
-            { opacity: animated.circleOpacity, transform: [{ scale: animated.circleScale }] },
+            styles.box,
+            { opacity: animated.boxOpacity, transform: [{ scale: animated.boxScale }] },
           ]}
         />
-        {label(false)}
-        {label(true)}
+        <Animated.Text style={[styles.number, { opacity: animated.plainOpacity }]}>
+          {day}
+        </Animated.Text>
+        <Animated.Text
+          style={[styles.number, styles.numberPicked, { opacity: animated.pickedOpacity }]}
+        >
+          {day}
+        </Animated.Text>
       </View>
     </Pressable>
   );
 });
 
-// Fits the number and weekday at their centered size, with a little room to spare.
-const CIRCLE_SIZE = 50;
+// Hugs the date, with just a little room around it.
+const BOX_SIZE = 28;
 
 const styles = StyleSheet.create({
   list: {
@@ -185,38 +186,51 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   day: {
-    paddingVertical: 10,
+    paddingVertical: 8,
     alignItems: 'center',
   },
-  body: {
-    width: CIRCLE_SIZE,
-    height: CIRCLE_SIZE,
-  },
-  circle: {
-    ...StyleSheet.absoluteFill,
-    borderRadius: CIRCLE_SIZE / 2,
-    backgroundColor: colors.ink,
-  },
-  label: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  number: {
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: '600',
-    color: colors.text,
+  // Holds both copies of the weekday on top of each other.
+  weekdayRow: {
+    alignSelf: 'stretch',
+    height: 16,
   },
   weekday: {
-    marginTop: 1,
-    fontSize: 10,
-    lineHeight: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    ...StyleSheet.absoluteFill,
+    textAlign: 'center',
+    fontSize: 13,
+    lineHeight: 16,
+    color: colors.textSubtle,
+  },
+  weekdayPicked: {
+    fontWeight: '700',
     color: colors.text,
   },
-  textOnCircle: {
-    color: colors.onInk,
+  dateBox: {
+    width: BOX_SIZE,
+    height: BOX_SIZE,
+  },
+  // Soft gray, rounded square behind the picked date.
+  box: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: 8,
+    backgroundColor: colors.inkSoft,
+  },
+  number: {
+    ...StyleSheet.absoluteFill,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    lineHeight: BOX_SIZE,
+    fontSize: 15,
+    // The default digits are all one width, so a narrow "1" has empty space on its left and
+    // dates like 15 sit off to the right of the box. Proportional digits center properly.
+    fontVariant: ['proportional-nums'],
+    // Android adds space above and below the text by default, which throws off centering
+    // in a fixed-height box.
+    includeFontPadding: false,
+    color: colors.textMuted,
+  },
+  numberPicked: {
+    fontWeight: '600',
+    color: colors.text,
   },
 });

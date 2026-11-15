@@ -77,15 +77,6 @@ export function formatDayPhrase(key: DateKey, now = new Date()): string {
   return relativeDayLabel(key, now)?.toLowerCase() ?? `on ${absoluteDayLabel(key, now)}`;
 }
 
-/** Pieces for the screen header, e.g. { weekday: "Thu", monthDay: "February 13", year: "2025" }. */
-export function getHeaderDateParts(date: Date) {
-  return {
-    weekday: shortWeekday(date),
-    monthDay: `${MONTHS_LONG[date.getMonth()]} ${date.getDate()}`,
-    year: String(date.getFullYear()),
-  };
-}
-
 export function isOverdue(key: DateKey, now = new Date()): boolean {
   return key < toDateKey(now);
 }
@@ -149,6 +140,19 @@ export function toTimeKey(hours: number, minutes: number): TimeKey {
 export function parseTimeKey(key: TimeKey): { hours: number; minutes: number } {
   const [hours, minutes] = key.split(':').map(Number);
   return { hours, minutes };
+}
+
+export const MINUTES_PER_DAY = 24 * 60;
+
+/** Minutes since midnight: "16:12" is 972. */
+export function toDayMinutes(key: TimeKey): number {
+  const { hours, minutes } = parseTimeKey(key);
+  return hours * 60 + minutes;
+}
+
+/** The other way round: 972 is "16:12". */
+export function fromDayMinutes(total: number): TimeKey {
+  return toTimeKey(Math.floor(total / 60), total % 60);
 }
 
 /** True for a well-formed "HH:mm" string, e.g. one read back from a route param. */

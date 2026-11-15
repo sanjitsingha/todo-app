@@ -32,6 +32,8 @@ type Options = {
   onChange: (index: number) => void;
   /** Scrolls the strip's list to an x offset. */
   scrollTo: (x: number, animated: boolean) => void;
+  /** Steps that can't be picked (e.g. times already passed). A swipe never rests on one. */
+  isDisabled?: (index: number) => boolean;
 };
 
 /**
@@ -44,8 +46,18 @@ type Options = {
  *   every tick re-rendered the whole screen mid-swipe, which made the ticks lag, and a late
  *   render would drag the strip back to a day it had already passed.
  * - A new `value` from outside (not from this strip) slides the strip to it.
+ * - Disabled steps are skipped: no tick, no tap, and a swipe that stops on one slides on to the
+ *   nearest step that can be picked.
  */
-export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, scrollTo }: Options) {
+export function useSnapStrip({
+  count,
+  stepWidth,
+  initialIndex,
+  value,
+  onChange,
+  scrollTo,
+  isDisabled,
+}: Options) {
   // Android turns `snapToInterval` into pixels by dropping the fraction: 52 points on a 2.625x
   // screen is 136.5 pixels, but it snaps every 136. The shortfall adds up with every step, and a
   // year into the date strip a swipe stopped between two days, with both half highlighted. So
@@ -58,9 +70,9 @@ export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, 
   const [scrollX] = useState(() => new Animated.Value(initialIndex * step));
 
   // Scroll callbacks read these, so they always reach the latest ones.
-  const latest = useRef({ onChange, scrollTo });
+  const latest = useRef({ onChange, scrollTo, isDisabled });
   useEffect(() => {
-    latest.current = { onChange, scrollTo };
+    latest.current = { onChange, scrollTo, isDisabled };
   });
 
   const strip = useRef({
@@ -90,6 +102,21 @@ export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, 
     [step],
   );
 
+  /** The closest step to `index` that can be picked (a later one on a tie), or null if none. */
+  const nearestEnabled = useCallback(
+    (index: number) => {
+      const disabled = latest.current.isDisabled;
+      if (!disabled?.(index)) return index;
+      for (let distance = 1; distance < count; distance++) {
+        for (const candidate of [index + distance, index - distance]) {
+          if (candidate >= 0 && candidate < count && !disabled(candidate)) return candidate;
+        }
+      }
+      return null;
+    },
+    [count],
+  );
+
   // The strip stopped moving at `x`: pick the step there.
   const settle = useCallback(
     (x: number) => {
@@ -97,19 +124,23 @@ export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, 
       clearTimeout(s.settleTimer);
       if (s.dragging) return;
 
-      const index = indexAt(x);
+      const under = indexAt(x);
+      // A disabled step slides on to the nearest one that can be picked. If there's none,
+      // the strip just rests and nothing is picked.
+      const enabled = nearestEnabled(under);
+      const index = enabled ?? under;
       // Never rest between two steps.
       if (Math.abs(x - index * step) > 1) latest.current.scrollTo(index * step, true);
 
-      if (s.slideTarget === null && index !== s.picked) {
+      if (enabled !== null && s.slideTarget === null && index !== s.picked) {
         s.picked = index;
         latest.current.onChange(index);
       }
     },
-    [indexAt, step],
+    [indexAt, nearestEnabled, step],
   );
 
-  // Each time a new step crosses the center during a swipe, tick.
+  // Each time a new step crosses the center during a swipe, tick (but not for disabled ones).
   useEffect(() => {
     const id = scrollX.addListener(({ value: x }) => {
       const s = strip.current;
@@ -121,6 +152,7 @@ export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, 
         if (index === s.slideTarget) s.slideTarget = null;
         return;
       }
+      if (latest.current.isDisabled?.(index)) return;
       const now = Date.now();
       if (now - s.lastTickAt < MIN_TICK_GAP_MS) return;
       s.lastTickAt = now;
@@ -143,10 +175,10 @@ export function useSnapStrip({ count, stepWidth, initialIndex, value, onChange, 
     return () => clearTimeout(s.settleTimer);
   }, []);
 
-  /** Picks a step and slides it to the center, as for a tap. */
+  /** Picks a step and slides it to the center, as for a tap. Disabled steps are ignored. */
   const pick = useCallback(
     (index: number) => {
-      if (index < 0 || index >= count) return;
+      if (index < 0 || index >= count || latest.current.isDisabled?.(index)) return;
       const s = strip.current;
       if (index !== s.picked) {
         tick();

@@ -1,5 +1,6 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import { CompletedSection } from '@/components/CompletedSection';
 import { DateHeader } from '@/components/DateHeader';
@@ -7,9 +8,11 @@ import { DateStrip } from '@/components/DateStrip';
 import { Dropdown, type DropdownOption } from '@/components/Dropdown';
 import { ScreenPlaceholder, type IconName } from '@/components/ScreenPlaceholder';
 import { TodoItem } from '@/components/TodoItem';
+import { TodoTimeline } from '@/components/TodoTimeline';
 import { colors } from '@/constants/theme';
 import { formatDayPhrase, fromDateKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
+import { updateSettings, useSettings } from '@/store/settings';
 import { useTodos, type Todo } from '@/store/todos';
 
 type StatusFilter = 'all' | 'pending' | 'completed';
@@ -58,6 +61,9 @@ export default function TodoScreen() {
   const { todos } = useTodos();
   const { today, selectedDate, selectDate } = useSelectedDate();
   const [filter, setFilter] = useState<StatusFilter>('all');
+  // List or timeline; remembered between launches.
+  const { todoView } = useSettings();
+  const showTimeline = todoView === 'timeline';
 
   // Todos due on the day picked in the strip, split by status. Ones with a time come first,
   // earliest first; the rest follow in the order they were added.
@@ -77,11 +83,39 @@ export default function TodoScreen() {
   const showCompletedSection = filter === 'all' && completedTodos.length > 0;
   const isEmpty = listTodos.length === 0 && !showCompletedSection;
 
+  // The timeline shows every todo the filter lets through, finished ones included.
+  const timelineTodos = useMemo(
+    () =>
+      filter === 'all'
+        ? [...pendingTodos, ...completedTodos]
+        : filter === 'pending'
+          ? pendingTodos
+          : completedTodos,
+    [filter, pendingTodos, completedTodos],
+  );
+
   const emptyState = EMPTY_STATES[filter];
+
+  const timelineButton = (
+    <Pressable
+      onPress={() => updateSettings({ todoView: showTimeline ? 'list' : 'timeline' })}
+      hitSlop={6}
+      style={({ pressed }) => [
+        styles.viewButton,
+        showTimeline && styles.viewButtonActive,
+        pressed && styles.viewButtonPressed,
+      ]}
+      accessibilityRole="switch"
+      accessibilityLabel="Timeline view"
+      accessibilityState={{ checked: showTimeline }}
+    >
+      <MaterialCommunityIcons name="timeline-clock-outline" size={24} color={colors.ink} />
+    </Pressable>
+  );
 
   return (
     <View style={styles.screen}>
-      <DateHeader date={fromDateKey(selectedDate)} />
+      <DateHeader date={fromDateKey(selectedDate)} action={timelineButton} />
       <DateStrip today={today} selectedDate={selectedDate} onSelectDate={selectDate} />
 
       {/* Everything below the date strip sits on plain white. */}
@@ -95,7 +129,9 @@ export default function TodoScreen() {
           />
         </View>
 
-        {isEmpty ? (
+        {showTimeline ? (
+          <TodoTimeline todos={timelineTodos} date={selectedDate} />
+        ) : isEmpty ? (
           <ScreenPlaceholder
             icon={emptyState.icon}
             title={emptyState.title}
@@ -125,12 +161,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
   },
+  // Round icon button; filled while the timeline is showing.
+  viewButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewButtonActive: {
+    backgroundColor: colors.inkSoft,
+  },
+  viewButtonPressed: {
+    backgroundColor: colors.border,
+  },
   toolbar: {
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
   },
+  // A little room between the filter and the first todo card.
   list: {
+    paddingTop: 8,
     paddingBottom: 16,
   },
 });

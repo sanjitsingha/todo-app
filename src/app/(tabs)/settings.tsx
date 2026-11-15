@@ -1,5 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Dropdown, type DropdownOption } from '@/components/Dropdown';
 import { colors } from '@/constants/theme';
@@ -13,6 +14,7 @@ const FEEDBACK_OPTIONS: readonly DropdownOption<FeedbackMode>[] = [
 ];
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { feedback } = useSettings();
 
   const setFeedback = (next: FeedbackMode) => {
@@ -23,6 +25,17 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      <Pressable
+        onPress={() => router.push('/login')}
+        style={styles.row}
+        android_ripple={{ color: colors.ripple }}
+        accessibilityRole="button"
+      >
+        <Ionicons name="person-circle-outline" size={22} color={colors.ink} />
+        <Text style={styles.rowTitle}>Sign in</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.iconInactive} />
+      </Pressable>
+
       <View style={styles.row}>
         <Ionicons name="volume-medium-outline" size={22} color={colors.ink} />
         <Text style={styles.rowTitle}>Haptic Feedback</Text>
