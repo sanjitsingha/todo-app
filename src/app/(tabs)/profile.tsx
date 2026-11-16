@@ -13,7 +13,8 @@ const FEEDBACK_OPTIONS: readonly DropdownOption<FeedbackMode>[] = [
   { value: 'tickVibrate', label: 'Tick with Vibration' },
 ];
 
-export default function SettingsScreen() {
+/** The Profile tab: signing in, and the app's settings (for now, haptic feedback). */
+export default function ProfileScreen() {
   const router = useRouter();
   const { feedback } = useSettings();
 

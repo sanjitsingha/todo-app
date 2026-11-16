@@ -1,22 +1,26 @@
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Animated,
-  FlatList,
   Pressable,
   StyleSheet,
   useWindowDimensions,
   View,
+  type FlatList,
 } from 'react-native';
+import {
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  type SharedValue,
+} from 'react-native-reanimated';
 
+import { DAYS_AFTER, DAYS_BEFORE } from '@/constants/dayRange';
 import { colors } from '@/constants/theme';
 import { useSnapStrip } from '@/hooks/useSnapStrip';
 import { addDays, shortWeekday, toDateKey, type DateKey } from '@/lib/dates';
 
 // A week across the screen, so the picked day sits in the middle with three on each side.
 const VISIBLE_DAYS = 7;
-const DAYS_BEFORE = 365;
-// Due dates can be set far ahead, so the strip reaches 5 years forward.
-const DAYS_AFTER = 365 * 5;
 
 type Props = {
   /** The real current date. Screen readers announce it as "today". */
@@ -24,6 +28,12 @@ type Props = {
   /** The day in the center of the strip. */
   selectedDate: DateKey;
   onSelectDate: (date: DateKey) => void;
+  /**
+   * While the day pager below is being swiped, the day it's at (day N of the range, with a
+   * fraction partway between two days); null otherwise. The strip moves along with it, frame
+   * by frame, ticking as each day passes the center.
+   */
+  follow?: SharedValue<number | null>;
 };
 
 /**
@@ -32,10 +42,17 @@ type Props = {
  * dark and bold, with a tick per day while swiping (src/hooks/useSnapStrip.ts).
  * The day is selected once the strip comes to rest. Tapping a day, or changing `selectedDate`
  * from outside (a todo added for another day, midnight), slides the strip to that day.
+ * Swiping the day pager below moves the strip along with it (`follow`).
  */
-export const DateStrip = memo(function DateStrip({ today, selectedDate, onSelectDate }: Props) {
+export const DateStrip = memo(function DateStrip({
+  today,
+  selectedDate,
+  onSelectDate,
+  follow,
+}: Props) {
   const { width } = useWindowDimensions();
-  const listRef = useRef<FlatList<Date>>(null);
+  // Also lets the UI thread scroll the strip, to follow the pager.
+  const listRef = useAnimatedRef<FlatList<Date>>();
   const todayKey = toDateKey(today);
 
   // A fixed range around the day the screen opened, so day positions never shift.
@@ -56,6 +73,17 @@ export const DateStrip = memo(function DateStrip({ today, selectedDate, onSelect
     onChange: (index) => onSelectDate(toDateKey(days[index])),
     scrollTo: (offset, animated) => listRef.current?.scrollToOffset({ offset, animated }),
   });
+
+  // Follow a swipe of the pager on the UI thread, so the two move together. The strip's own
+  // scroll updates then run the highlight and the ticks, the same as when it's swiped itself.
+  // When the pager comes to rest it picks the day, and the strip is already there.
+  useAnimatedReaction(
+    () => follow?.get() ?? null,
+    (day) => {
+      if (day !== null) scrollTo(listRef, day * step, 0, false);
+    },
+    [step],
+  );
 
   const renderItem = useCallback(
     ({ item, index }: { item: Date; index: number }) => (
@@ -176,8 +204,10 @@ const DayItem = memo(function DayItem({
   );
 });
 
-// Hugs the date, with just a little room around it.
-const BOX_SIZE = 28;
+// Hugs the date, with just a little room around it. The hour and minute strips
+// (src/components/PickerStrip.tsx) use the same shape, scaled up.
+export const DAY_BOX_SIZE = 28;
+export const DAY_BOX_RADIUS = 8;
 
 const styles = StyleSheet.create({
   list: {
@@ -206,20 +236,20 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   dateBox: {
-    width: BOX_SIZE,
-    height: BOX_SIZE,
+    width: DAY_BOX_SIZE,
+    height: DAY_BOX_SIZE,
   },
   // Soft gray, rounded square behind the picked date.
   box: {
     ...StyleSheet.absoluteFill,
-    borderRadius: 8,
+    borderRadius: DAY_BOX_RADIUS,
     backgroundColor: colors.inkSoft,
   },
   number: {
     ...StyleSheet.absoluteFill,
     textAlign: 'center',
     textAlignVertical: 'center',
-    lineHeight: BOX_SIZE,
+    lineHeight: DAY_BOX_SIZE,
     fontSize: 15,
     // The default digits are all one width, so a narrow "1" has empty space on its left and
     // dates like 15 sit off to the right of the box. Proportional digits center properly.

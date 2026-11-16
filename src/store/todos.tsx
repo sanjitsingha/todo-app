@@ -1,6 +1,7 @@
 import Storage from 'expo-sqlite/kv-store';
 import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { isDuration } from '@/constants/duration';
 import { isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
 import { syncReminders } from '@/lib/reminders';
 
@@ -16,6 +17,8 @@ export type Todo = {
   dueTime?: TimeKey;
   /** Time of day on the due date to get a notification, if one was set. */
   reminderTime?: TimeKey;
+  /** How long it takes, in minutes, if set. */
+  duration?: number;
   priority: Priority;
   completed: boolean;
   createdAt: number;
@@ -23,7 +26,7 @@ export type Todo = {
 
 export type NewTodo = Pick<
   Todo,
-  'title' | 'description' | 'dueDate' | 'dueTime' | 'reminderTime' | 'priority'
+  'title' | 'description' | 'dueDate' | 'dueTime' | 'reminderTime' | 'duration' | 'priority'
 >;
 
 function isPriority(value: unknown): value is Priority {
@@ -56,6 +59,7 @@ function loadTodos(): Todo[] {
       priority: isPriority(todo.priority) ? todo.priority : 'medium',
       dueTime: isTimeKey(todo.dueTime) ? todo.dueTime : undefined,
       reminderTime: isTimeKey(todo.reminderTime) ? todo.reminderTime : undefined,
+      duration: isDuration(todo.duration) ? todo.duration : undefined,
     }));
   } catch (error) {
     console.warn('Could not load saved todos', error);

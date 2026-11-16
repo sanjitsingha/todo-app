@@ -3,39 +3,40 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors } from '@/constants/theme';
-import { formatHeaderDay, formatLongDate, type DateKey } from '@/lib/dates';
+import { formatLongDate, headerMonth, type DateKey } from '@/lib/dates';
 
 type Props = {
   /** The picked day. */
   date: DateKey;
-  /** The real current date, to tell today and yesterday apart from other days. */
-  today: Date;
-  /** Shown right after the day, e.g. the goal ring. */
+  /** Shown right after the month, e.g. the goal ring. */
   accessory?: ReactNode;
-  /** Shown on the right, level with the day, e.g. the timeline button. */
+  /** Shown on the right, level with the month, e.g. the timeline button. */
   action?: ReactNode;
 };
 
 /**
- * Screen header: the picked day, big — "Today", "Yesterday", or the weekday, e.g. "Wednesday" —
- * with an optional accessory right after it and an optional button on the right. Screen readers
- * get the full date.
+ * Screen header: the picked day's month, big, then the year's last two digits in gray,
+ * e.g. "November 26" (the date strip below already shows the weekday and date). An optional
+ * accessory sits right after it and an optional button on the right. Screen readers get the
+ * full date.
  */
-export function DateHeader({ date, today, accessory, action }: Props) {
+export function DateHeader({ date, accessory, action }: Props) {
   const insets = useSafeAreaInsets();
+  const { month, year } = headerMonth(date);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 36 }]}>
       <View style={styles.title}>
         <Text
-          style={styles.day}
-          // Long names like "Wednesday" shrink a little on narrow phones instead of wrapping.
+          style={styles.month}
+          // Long months like "September 26" shrink a little on narrow phones instead of wrapping.
           numberOfLines={1}
           adjustsFontSizeToFit
           accessibilityRole="header"
           accessibilityLabel={formatLongDate(date)}
         >
-          {formatHeaderDay(date, today)}
+          {`${month} `}
+          <Text style={styles.year}>{year}</Text>
         </Text>
         {accessory}
       </View>
@@ -52,19 +53,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  // The day and its accessory side by side; it gives way to the button on the right.
+  // The month and its accessory side by side; it gives way to the button on the right.
   title: {
     flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  day: {
+  month: {
     flexShrink: 1,
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '700',
-    letterSpacing: -1,
+    fontSize: 28,
+    lineHeight: 36,
+    fontWeight: '600',
+    letterSpacing: -0.8,
     color: colors.text,
+  },
+  // The same size and weight as the month, in gray.
+  year: {
+    color: colors.textMuted,
   },
 });

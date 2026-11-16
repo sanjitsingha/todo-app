@@ -8,10 +8,22 @@ import {
   type ScrollViewInstance,
 } from 'react-native';
 
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+
+import { DAY_BOX_RADIUS, DAY_BOX_SIZE } from '@/components/DateStrip';
 import { colors } from '@/constants/theme';
 import { useSnapStrip } from '@/hooks/useSnapStrip';
 
 const ITEM_WIDTH = 52;
+const STRIP_HEIGHT = 44;
+/**
+ * A square with just room for a two-digit value at full magnification: the date strip's box,
+ * scaled up, with its corners scaled to match so it's the same shape.
+ */
+const BOX_SIZE = 36;
+const BOX_RADIUS = Math.round(BOX_SIZE * (DAY_BOX_RADIUS / DAY_BOX_SIZE));
+/** How far in from each end the values fade out. */
+const FADE_WIDTH = 64;
 
 type Props = {
   /** What each step shows, e.g. "1" to "12". */
@@ -27,9 +39,9 @@ type Props = {
 
 /**
  * A swipeable row of values that works like the date strip: the one in the center is picked
- * once the strip comes to rest, it grows and gets a box, and each step gives a tick. Tapping a
- * value slides it in. Horizontal on purpose: a vertical wheel would fight the sheet's own
- * up / down drag.
+ * once the strip comes to rest, it's magnified and gets a snug soft gray box (the same as the
+ * picked day in the date strip), and each step gives a tick. Tapping a value slides it in.
+ * Horizontal on purpose: a vertical wheel would fight the sheet's own up / down drag.
  */
 export function PickerStrip({ items, value, onChange, accessibilityLabel, isDisabled }: Props) {
   const scrollRef = useRef<ScrollViewInstance>(null);
@@ -100,7 +112,36 @@ export function PickerStrip({ items, value, onChange, accessibilityLabel, isDisa
           ))}
         </Animated.ScrollView>
       ) : null}
+
+      {/* The values fade out toward both ends. Taps go through to them. */}
+      <EdgeFade side="left" />
+      <EdgeFade side="right" />
     </View>
+  );
+}
+
+/**
+ * A white-to-clear gradient over one end of the strip, drawn with SVG (no extra native module
+ * needed). White matches the sheets the strips sit on.
+ */
+function EdgeFade({ side }: { side: 'left' | 'right' }) {
+  const id = `picker-strip-fade-${side}`;
+  // Solid at the outer edge, clear toward the middle.
+  const [from, to] = side === 'left' ? [1, 0] : [0, 1];
+  return (
+    <Svg
+      width={FADE_WIDTH}
+      height={STRIP_HEIGHT}
+      style={[styles.fade, side === 'left' ? styles.fadeLeft : styles.fadeRight]}
+    >
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="0">
+          <Stop offset="0" stopColor={colors.surface} stopOpacity={from} />
+          <Stop offset="1" stopColor={colors.surface} stopOpacity={to} />
+        </LinearGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
   );
 }
 
@@ -130,7 +171,8 @@ const StripItem = memo(function StripItem({
     return {
       boxOpacity: between(0, 1),
       boxScale: between(0.8, 1),
-      labelScale: between(0.85, 1.2),
+      // The picked value is magnified well above its neighbors.
+      labelScale: between(0.8, 1.4),
       labelOpacity: between(0.3, 1),
     };
   }, [scrollX, index, step]);
@@ -162,32 +204,42 @@ const StripItem = memo(function StripItem({
 const styles = StyleSheet.create({
   // Fixed height, so nothing jumps while the width is being measured.
   container: {
-    height: 52,
+    height: STRIP_HEIGHT,
   },
   item: {
-    height: 52,
+    height: STRIP_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  // Over each end of the strip; taps pass through to the values underneath.
+  fade: {
+    position: 'absolute',
+    top: 0,
+    pointerEvents: 'none',
+  },
+  fadeLeft: {
+    left: 0,
+  },
+  fadeRight: {
+    right: 0,
   },
   // Faded well below the other values, so it reads as out of reach.
   itemDisabled: {
     opacity: 0.35,
   },
-  // Same box as the selected day in the date strip.
+  // The same soft gray square as the picked day in the date strip, just hugging the magnified
+  // value. Centered in its step.
   box: {
     position: 'absolute',
-    top: 2,
-    bottom: 2,
-    left: 3,
-    right: 3,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    width: BOX_SIZE,
+    height: BOX_SIZE,
+    borderRadius: BOX_RADIUS,
+    backgroundColor: colors.inkSoft,
   },
+  // The date strip's date size, before it's magnified.
   label: {
-    fontSize: 18,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     fontWeight: '600',
     color: colors.text,
   },

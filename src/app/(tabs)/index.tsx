@@ -1,22 +1,33 @@
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, View } from 'react-native';
+// Just these icons, not the whole icon set.
+import GalleryVertical from 'lucide-react-native/icons/gallery-vertical';
+import Rows3 from 'lucide-react-native/icons/rows-3';
+import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 
-import { CompletedSection } from '@/components/CompletedSection';
 import { DateHeader } from '@/components/DateHeader';
 import { DateStrip } from '@/components/DateStrip';
+import { DayPager } from '@/components/DayPager';
+import { DayTodos, useDayTodos, type StatusFilter } from '@/components/DayTodos';
 import { Dropdown, type DropdownOption } from '@/components/Dropdown';
 import { GoalRing } from '@/components/GoalRing';
-import { ScreenPlaceholder, type IconName } from '@/components/ScreenPlaceholder';
-import { TodoItem } from '@/components/TodoItem';
-import { TodoTimeline } from '@/components/TodoTimeline';
 import { colors } from '@/constants/theme';
-import { formatDayPhrase } from '@/lib/dates';
+import type { DateKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 import { updateSettings, useSettings } from '@/store/settings';
-import { useTodos, type Todo } from '@/store/todos';
 
-type StatusFilter = 'all' | 'pending' | 'completed';
+/**
+ * The view button's icons, drawn to the same size. Lucide's rows-3 is a square 20 of its 24
+ * units tall; gallery-vertical's top and bottom lines reach 22, so at the same size it comes
+ * out taller and the icon seems to grow when the view changes. It's drawn smaller to fit the
+ * same square, with its stroke thickened to match, so its lines are just as thick.
+ */
+const VIEW_ICON_SIZE = 20;
+const ROWS_ICON_UNITS = 20;
+const GALLERY_ICON_UNITS = 22;
+const LUCIDE_STROKE = 2;
+const GALLERY_ICON_SIZE = VIEW_ICON_SIZE * (ROWS_ICON_UNITS / GALLERY_ICON_UNITS);
+const GALLERY_STROKE = LUCIDE_STROKE * (VIEW_ICON_SIZE / GALLERY_ICON_SIZE);
 
 const FILTER_OPTIONS: DropdownOption<StatusFilter>[] = [
   { value: 'all', label: 'All todos' },
@@ -24,93 +35,61 @@ const FILTER_OPTIONS: DropdownOption<StatusFilter>[] = [
   { value: 'completed', label: 'Completed' },
 ];
 
-const EMPTY_STATES: Record<
-  StatusFilter,
-  { icon: IconName; title: string; message: (day: string) => string }
-> = {
-  all: {
-    icon: 'list-outline',
-    title: 'No todos',
-    message: (day) => `Nothing due ${day}. Tap + to add one.`,
-  },
-  pending: {
-    icon: 'time-outline',
-    title: 'Nothing pending',
-    message: (day) => `No open todos ${day}.`,
-  },
-  completed: {
-    icon: 'checkmark-done-outline',
-    title: 'Nothing completed',
-    message: (day) => `No finished todos ${day}.`,
-  },
-};
-
-// Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
-const UNTIMED = '~';
-
-function compareTodos(a: Todo, b: Todo): number {
-  const timeA = a.dueTime ?? UNTIMED;
-  const timeB = b.dueTime ?? UNTIMED;
-  if (timeA !== timeB) return timeA < timeB ? -1 : 1;
-  return a.createdAt - b.createdAt;
-}
-
-const keyExtractor = (todo: Todo) => todo.id;
-const renderTodo = ({ item }: { item: Todo }) => <TodoItem todo={item} />;
-
 export default function TodoScreen() {
-  const { todos } = useTodos();
   const { today, selectedDate, selectDate } = useSelectedDate();
   const [filter, setFilter] = useState<StatusFilter>('all');
   // List or timeline; remembered between launches.
   const { todoView } = useSettings();
   const showTimeline = todoView === 'timeline';
 
-  // Todos due on the day picked in the strip, split by status. Ones with a time come first,
-  // earliest first; the rest follow in the order they were added.
-  const { pendingTodos, completedTodos } = useMemo(() => {
-    const dayTodos = todos
-      .filter((todo) => todo.dueDate === selectedDate)
-      .sort(compareTodos);
-    return {
-      pendingTodos: dayTodos.filter((todo) => !todo.completed),
-      completedTodos: dayTodos.filter((todo) => todo.completed),
-    };
-  }, [todos, selectedDate]);
+  // For the goal ring: every todo due on the picked day, whatever the filter shows.
+  const { pendingTodos, completedTodos } = useDayTodos(selectedDate);
 
-  // "All todos": unfinished ones in the list, finished ones in a Completed section below it.
-  // "Pending" / "Completed": just that one list.
-  const listTodos = filter === 'completed' ? completedTodos : pendingTodos;
-  const showCompletedSection = filter === 'all' && completedTodos.length > 0;
-  const isEmpty = listTodos.length === 0 && !showCompletedSection;
+  // Where a swipe of the day pager has got to, for the date strip to move along with it.
+  const swipePosition = useSharedValue<number | null>(null);
 
-  // The timeline shows every todo the filter lets through, finished ones included.
-  const timelineTodos = useMemo(
-    () =>
-      filter === 'all'
-        ? [...pendingTodos, ...completedTodos]
-        : filter === 'pending'
-          ? pendingTodos
-          : completedTodos,
-    [filter, pendingTodos, completedTodos],
+  // Switching views draws a whole new list or timeline for each day the pager has ready,
+  // which takes a moment, so it's done in steps that never hold up the screen: the button
+  // changes at once; then the day on screen switches, drawn in the background (React pauses it
+  // for anything urgent); then, once that's on screen, the days beside it follow.
+  const pageShowsTimeline = useDeferredValue(showTimeline);
+  const [besideShowsTimeline, setBesideShowsTimeline] = useState(showTimeline);
+  useEffect(() => {
+    startTransition(() => setBesideShowsTimeline(pageShowsTimeline));
+  }, [pageShowsTimeline]);
+
+  // One page per day, swiped through sideways (src/components/DayPager.tsx).
+  const renderDay = useCallback(
+    (date: DateKey) => (
+      <DayTodos
+        date={date}
+        today={today}
+        filter={filter}
+        showTimeline={date === selectedDate ? pageShowsTimeline : besideShowsTimeline}
+      />
+    ),
+    [today, filter, selectedDate, pageShowsTimeline, besideShowsTimeline],
   );
-
-  const emptyState = EMPTY_STATES[filter];
 
   const timelineButton = (
     <Pressable
       onPress={() => updateSettings({ todoView: showTimeline ? 'list' : 'timeline' })}
       hitSlop={6}
-      style={({ pressed }) => [
-        styles.viewButton,
-        showTimeline && styles.viewButtonActive,
-        pressed && styles.viewButtonPressed,
-      ]}
+      style={({ pressed }) => [styles.viewButton, pressed && styles.viewButtonPressed]}
       accessibilityRole="switch"
       accessibilityLabel="Timeline view"
       accessibilityState={{ checked: showTimeline }}
     >
-      <MaterialCommunityIcons name="timeline-clock-outline" size={24} color={colors.ink} />
+      {/* Shows the view you're in: rows for the list, the timeline icon for the timeline. */}
+      {showTimeline ? (
+        <GalleryVertical
+          size={GALLERY_ICON_SIZE}
+          strokeWidth={GALLERY_STROKE}
+          color={colors.ink}
+        />
+      ) : (
+        <Rows3 size={VIEW_ICON_SIZE} color={colors.ink} />
+      )}
     </Pressable>
   );
 
@@ -118,8 +97,6 @@ export default function TodoScreen() {
     <View style={styles.screen}>
       <DateHeader
         date={selectedDate}
-        today={today}
-        // Every todo due that day, whatever the filter shows.
         accessory={
           <GoalRing
             total={pendingTodos.length + completedTodos.length}
@@ -128,9 +105,15 @@ export default function TodoScreen() {
         }
         action={timelineButton}
       />
-      <DateStrip today={today} selectedDate={selectedDate} onSelectDate={selectDate} />
+      <DateStrip
+        today={today}
+        selectedDate={selectedDate}
+        onSelectDate={selectDate}
+        follow={swipePosition}
+      />
 
-      {/* Everything below the date strip sits on plain white. */}
+      {/* Everything below the date strip sits on plain white. The filter stays put; the day's
+          todos below it swipe sideways to the next or previous day. */}
       <View style={styles.section}>
         <View style={styles.toolbar}>
           <Dropdown
@@ -141,25 +124,13 @@ export default function TodoScreen() {
           />
         </View>
 
-        {showTimeline ? (
-          <TodoTimeline todos={timelineTodos} date={selectedDate} />
-        ) : isEmpty ? (
-          <ScreenPlaceholder
-            icon={emptyState.icon}
-            title={emptyState.title}
-            subtitle={emptyState.message(formatDayPhrase(selectedDate, today))}
-          />
-        ) : (
-          <FlatList
-            data={listTodos}
-            keyExtractor={keyExtractor}
-            renderItem={renderTodo}
-            ListFooterComponent={
-              showCompletedSection ? <CompletedSection todos={completedTodos} /> : undefined
-            }
-            contentContainerStyle={styles.list}
-          />
-        )}
+        <DayPager
+          today={today}
+          selectedDate={selectedDate}
+          onSelectDate={selectDate}
+          renderDay={renderDay}
+          swipePosition={swipePosition}
+        />
       </View>
     </View>
   );
@@ -173,16 +144,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
   },
-  // Round icon button; filled while the timeline is showing.
+  // Round icon button; its icon shows which view is on.
   viewButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  viewButtonActive: {
-    backgroundColor: colors.inkSoft,
   },
   viewButtonPressed: {
     backgroundColor: colors.border,
@@ -191,10 +159,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 4,
-  },
-  // A little room between the filter and the first todo card.
-  list: {
-    paddingTop: 8,
-    paddingBottom: 16,
   },
 });

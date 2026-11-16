@@ -7,11 +7,9 @@ import { SheetGrabber } from '@/components/SheetGrabber';
 import { TimePicker } from '@/components/TimePicker';
 import { colors } from '@/constants/theme';
 import { useNow } from '@/hooks/useNow';
-import { toAddSheetParams } from '@/lib/addSheetParams';
+import { parseDurationParam, toAddSheetParams } from '@/lib/addSheetParams';
 import {
   defaultTime,
-  formatDayPhrase,
-  formatTime,
   fromDayMinutes,
   isDateKey,
   isTimeKey,
@@ -42,10 +40,13 @@ export default function ReminderScreen() {
     dueDate?: string;
     dueTime?: string;
     value?: string;
+    duration?: string;
     todoId?: string;
   }>();
   const dueDate = isDateKey(params.dueDate) ? params.dueDate : todayKey;
   const dueTime = isTimeKey(params.dueTime) ? params.dueTime : undefined;
+  // Not changed here; handed back as is (see src/lib/addSheetParams.ts).
+  const duration = parseDurationParam(params.duration);
   const [initialValue] = useState(() => (isTimeKey(params.value) ? params.value : undefined));
   // Starts on the current reminder, else the due time, else the next whole hour (or 9:00 am).
   const [picked, setPicked] = useState<TimeKey>(
@@ -68,7 +69,7 @@ export default function ReminderScreen() {
     }
     router.dismissTo({
       pathname: '/add',
-      params: toAddSheetParams({ dueDate, dueTime, reminderTime }),
+      params: toAddSheetParams({ dueDate, dueTime, reminderTime, duration }),
     });
   };
 
@@ -94,11 +95,12 @@ export default function ReminderScreen() {
       <Text style={styles.heading} accessibilityRole="header">
         Reminder
       </Text>
-      <Text style={styles.summary} accessibilityLiveRegion="polite">
-        {noneLeft
-          ? 'This day is over. Pick a later due date to set a reminder.'
-          : `You’ll get a notification ${formatDayPhrase(dueDate, now)} at ${formatTime(time)}.`}
-      </Text>
+      {/* Only when there's no time left to pick, to say why the button is off. */}
+      {noneLeft ? (
+        <Text style={styles.summary} accessibilityLiveRegion="polite">
+          This day is over. Pick a later due date to set a reminder.
+        </Text>
+      ) : null}
 
       <TimePicker value={time} onChange={setPicked} earliest={earliest} />
 

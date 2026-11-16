@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DAY_BOX_RADIUS, DAY_BOX_SIZE } from '@/components/DateStrip';
 import { colors } from '@/constants/theme';
 import {
   WEEKDAYS,
@@ -145,7 +146,7 @@ function DayCell({
           >
             {Number(day.slice(8))}
           </Text>
-          {isToday ? <View style={[styles.todayDot, selected && styles.todayDotSelected]} /> : null}
+          {isToday ? <View style={styles.todayDot} /> : null}
         </View>
       )}
     </Pressable>
@@ -153,6 +154,8 @@ function DayCell({
 }
 
 const DAY_SIZE = 38;
+/** The date strip's box corners, scaled to this size, so the picked day is the same shape. */
+const DAY_RADIUS = Math.round(DAY_SIZE * (DAY_BOX_RADIUS / DAY_BOX_SIZE));
 
 const styles = StyleSheet.create({
   header: {
@@ -203,15 +206,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // A rounded square, like the picked day in the date strip (the press shade takes it too).
   day: {
     width: DAY_SIZE,
     height: DAY_SIZE,
-    borderRadius: DAY_SIZE / 2,
+    borderRadius: DAY_RADIUS,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // The date strip's soft gray.
   daySelected: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.inkSoft,
   },
   dayText: {
     fontSize: 15,
@@ -223,12 +228,13 @@ const styles = StyleSheet.create({
   },
   dayTextSelected: {
     fontWeight: '700',
-    color: colors.onPrimary,
+    color: colors.text,
   },
   dayTextDisabled: {
     color: colors.textSubtle,
     opacity: 0.5,
   },
+  // Stays orange when today is picked too: it shows up well on the gray.
   todayDot: {
     position: 'absolute',
     bottom: 5,
@@ -236,8 +242,5 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: colors.accent,
-  },
-  todayDotSelected: {
-    backgroundColor: colors.onPrimary,
   },
 });

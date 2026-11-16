@@ -80,7 +80,7 @@ function firmVibration() {
 
 /**
  * One step of a swipeable strip (days, hours, minutes), as picked under "Haptic Feedback" in
- * Settings: a firm vibration, a tick sound, or a tick sound with a light vibration.
+ * Profile: a firm vibration, a tick sound, or a tick sound with a light vibration.
  */
 export function tick() {
   syncPlayers();

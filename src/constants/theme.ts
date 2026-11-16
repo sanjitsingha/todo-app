@@ -37,7 +37,10 @@ export const colors = {
   accentSoft: '#FFEDD5',
   accentDark: '#C2410C',
   ripple: 'rgba(31, 41, 55, 0.12)',
-  /** Icon colors for the quick due-date choices ("Today" uses `accent`, "Next week" `ink`). */
+  /**
+   * Icon colors for the due-date kinds (src/constants/dueDate.ts): `sun` for tomorrow, `sky` for
+   * this weekend ("Today" uses `accent`, "Next week" `ink`).
+   */
   sun: '#EAB308',
   sky: '#0EA5E9',
 } as const;

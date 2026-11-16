@@ -50,6 +50,16 @@ const LEAD_MINUTES = 120;
 
 // The zoom is kept while the app is open, so switching views or days doesn't reset it.
 let savedHourHeight = DEFAULT_HOUR_HEIGHT;
+// The day pager keeps the days beside the one on screen drawn too, each with its own timeline.
+// They take on a pinch once it ends, so the next day slides in at the same zoom.
+const zoomFollowers = new Set<(height: number) => void>();
+
+function saveZoom(height: number, from: (height: number) => void) {
+  savedHourHeight = height;
+  zoomFollowers.forEach((follow) => {
+    if (follow !== from) follow(height);
+  });
+}
 
 /** Gesture handler's scroll view (so it can scroll alongside the pinch), driven by Reanimated. */
 const AnimatedScrollView = Animated.createAnimatedComponent(GestureScrollView);
@@ -138,6 +148,15 @@ export function TodoTimeline({ todos, date }: Props) {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
   const hourHeight = useSharedValue(savedHourHeight);
+
+  // Takes on a zoom pinched on another day's timeline.
+  const [followZoom] = useState(() => (height: number) => hourHeight.set(height));
+  useEffect(() => {
+    zoomFollowers.add(followZoom);
+    return () => {
+      zoomFollowers.delete(followZoom);
+    };
+  }, [followZoom]);
 
   // How tall each block's title and time are, as laid out. A block is never shorter than its
   // title, so a block that needs more room pushes the ones after it down.
@@ -244,9 +263,7 @@ export function TodoTimeline({ todos, date }: Props) {
   const pinchStartHeight = useSharedValue(savedHourHeight);
   const pinchAnchorMinutes = useSharedValue(0);
   const pinchFocalY = useSharedValue(0);
-  const saveZoom = (height: number) => {
-    savedHourHeight = height;
-  };
+  const saveZoomFromHere = (height: number) => saveZoom(height, followZoom);
 
   const pinch = usePinchGesture({
     onActivate: (event) => {
@@ -266,7 +283,7 @@ export function TodoTimeline({ todos, date }: Props) {
     },
     onFinalize: () => {
       'worklet';
-      scheduleOnRN(saveZoom, hourHeight.get());
+      scheduleOnRN(saveZoomFromHere, hourHeight.get());
     },
   });
 

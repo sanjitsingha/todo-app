@@ -4,17 +4,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Calendar } from '@/components/Calendar';
 import { DUE_DATE_COLORS } from '@/constants/dueDate';
 import { colors } from '@/constants/theme';
-import {
-  addDays,
-  formatLongDate,
-  formatShortDate,
-  nextWeek,
-  thisWeekend,
-  toDateKey,
-  type DateKey,
-} from '@/lib/dates';
+import { addDays, formatLongDate, formatShortDate, toDateKey, type DateKey } from '@/lib/dates';
 
-type IconName = 'today-outline' | 'sunny-outline' | 'cafe-outline' | 'arrow-forward-circle-outline';
+type IconName = 'today-outline' | 'sunny-outline';
 
 type Props = {
   /** The picked day. */
@@ -24,7 +16,7 @@ type Props = {
   onSelect: (date: DateKey) => void;
 };
 
-/** Quick choices (Today, Tomorrow, This weekend, Next week) above a month calendar. */
+/** Quick choices (Today, Tomorrow) above a month calendar. */
 export function DueDatePicker({ value, today, onSelect }: Props) {
   const todayKey = toDateKey(today);
 
@@ -36,18 +28,6 @@ export function DueDatePicker({ value, today, onSelect }: Props) {
       icon: 'sunny-outline',
       color: DUE_DATE_COLORS.tomorrow.icon,
       date: toDateKey(addDays(today, 1)),
-    },
-    {
-      label: 'This weekend',
-      icon: 'cafe-outline',
-      color: DUE_DATE_COLORS.weekend.icon,
-      date: toDateKey(thisWeekend(today)),
-    },
-    {
-      label: 'Next week',
-      icon: 'arrow-forward-circle-outline',
-      color: DUE_DATE_COLORS.nextWeek.icon,
-      date: toDateKey(nextWeek(today)),
     },
   ];
 

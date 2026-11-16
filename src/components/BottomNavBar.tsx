@@ -1,30 +1,50 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import type { ComponentProps } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+// Just these icons, not the whole icon set.
+import ChartPie from 'lucide-react-native/icons/chart-pie';
+import CirclePlus from 'lucide-react-native/icons/circle-plus';
+import LayoutList from 'lucide-react-native/icons/layout-list';
+import UserRound from 'lucide-react-native/icons/user-round';
+import type { ReactNode } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
 
-type IconName = ComponentProps<typeof Ionicons>['name'];
+const TAB_ICON_SIZE = 22;
+/** Space between an icon and its name. */
+const LABEL_GAP = 6;
 
 type TabConfig = {
+  /** Shown under the icon. */
   label: string;
-  icon: IconName;
-  iconFocused: IconName;
+  /** The tab's icon, in `color` (dark when the tab is open, gray otherwise). */
+  renderIcon: (color: string) => ReactNode;
 };
 
 // Keys are route names from src/app/(tabs)/.
 const TABS = {
-  index: { label: 'Todo', icon: 'list-outline', iconFocused: 'list' },
-  settings: { label: 'Settings', icon: 'settings-outline', iconFocused: 'settings' },
+  // Lucide icons are outlines only, so the open tab shows by its color.
+  index: {
+    label: 'Today',
+    renderIcon: (color) => <LayoutList size={TAB_ICON_SIZE} color={color} />,
+  },
+  stats: {
+    label: 'Stats',
+    renderIcon: (color) => <ChartPie size={TAB_ICON_SIZE} color={color} />,
+  },
+  profile: {
+    label: 'Profile',
+    renderIcon: (color) => <UserRound size={TAB_ICON_SIZE} color={color} />,
+  },
 } satisfies Record<string, TabConfig>;
 
 type TabName = keyof typeof TABS;
 
 /**
- * Bottom navbar: Todo on the left, a round "+" in the middle, Settings on the right.
- * The "+" is not a tab. It opens the Add todo screen above the current tab.
+ * Bottom navbar, evenly spaced, each an icon with its name under it: Today (the Todo screen),
+ * Add Todo, Stats, and Profile. The open tab is dark, the rest gray. Add Todo is not a tab: a
+ * plain button like the tabs around it, in their gray, that opens the Add todo sheet above the
+ * current tab.
  */
 export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const router = useRouter();
@@ -54,11 +74,8 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
         accessibilityLabel={tab.label}
         accessibilityState={{ selected: focused }}
       >
-        <Ionicons
-          name={focused ? tab.iconFocused : tab.icon}
-          size={26}
-          color={focused ? colors.ink : colors.iconInactive}
-        />
+        {tab.renderIcon(focused ? colors.ink : colors.iconInactive)}
+        <Text style={[styles.label, focused && styles.labelFocused]}>{tab.label}</Text>
       </Pressable>
     );
   };
@@ -70,20 +87,28 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
 
         <Pressable
           onPress={() => router.push('/add')}
-          style={({ pressed }) => [styles.addButton, pressed && styles.addButtonPressed]}
+          style={styles.tab}
+          android_ripple={{ color: colors.ripple, borderless: true, radius: 28 }}
           accessibilityRole="button"
           accessibilityLabel="Add todo"
         >
-          <Ionicons name="add" size={32} color={colors.onPrimary} />
+          {/* Android shows a ripple; iOS dims the icon and name while pressed. */}
+          {({ pressed }) => (
+            <View
+              style={[styles.content, pressed && Platform.OS !== 'android' && styles.pressed]}
+            >
+              <CirclePlus size={TAB_ICON_SIZE} color={colors.iconInactive} />
+              <Text style={styles.label}>Add Todo</Text>
+            </View>
+          )}
         </Pressable>
 
-        {renderTab('settings')}
+        {renderTab('stats')}
+        {renderTab('profile')}
       </View>
     </View>
   );
 }
-
-const ADD_BUTTON_SIZE = 56;
 
 const styles = StyleSheet.create({
   bar: {
@@ -96,27 +121,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  // Icon over name, centered in an equal share of the bar.
   tab: {
     flex: 1,
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: LABEL_GAP,
   },
-  addButton: {
-    width: ADD_BUTTON_SIZE,
-    height: ADD_BUTTON_SIZE,
-    borderRadius: ADD_BUTTON_SIZE / 2,
-    backgroundColor: colors.primary,
+  content: {
     alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
+    gap: LABEL_GAP,
   },
-  addButtonPressed: {
-    backgroundColor: colors.primaryPressed,
-    transform: [{ scale: 0.95 }],
+  pressed: {
+    opacity: 0.5,
+  },
+  label: {
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: colors.iconInactive,
+  },
+  labelFocused: {
+    fontWeight: '600',
+    color: colors.ink,
   },
 });

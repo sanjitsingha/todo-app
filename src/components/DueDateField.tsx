@@ -8,8 +8,10 @@ import { formatDueDateTime, type DateKey, type TimeKey } from '@/lib/dates';
 type Props = {
   value: DateKey;
   time?: TimeKey;
-  /** Not shown here; passed through the due-date sheet so it survives the trip. */
+  /** Not shown here; passed through the due-date sheet so they survive the trip. */
   reminderTime?: TimeKey;
+  /** In minutes. */
+  duration?: number;
 };
 
 /**
@@ -17,7 +19,7 @@ type Props = {
  * sheet on top (src/app/due-date.tsx), which sends the pick back as the add sheet's
  * `dueDate` / `dueTime` params.
  */
-export function DueDateField({ value, time, reminderTime }: Props) {
+export function DueDateField({ value, time, reminderTime, duration }: Props) {
   const router = useRouter();
   const label = formatDueDateTime(value, time);
 
@@ -25,7 +27,12 @@ export function DueDateField({ value, time, reminderTime }: Props) {
     Keyboard.dismiss();
     router.push({
       pathname: '/due-date',
-      params: { value, ...(time ? { time } : {}), ...(reminderTime ? { reminderTime } : {}) },
+      params: {
+        value,
+        ...(time ? { time } : {}),
+        ...(reminderTime ? { reminderTime } : {}),
+        ...(duration ? { duration: String(duration) } : {}),
+      },
     });
   };
 

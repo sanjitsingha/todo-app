@@ -13,18 +13,21 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DueDateField } from '@/components/DueDateField';
+import { DurationField } from '@/components/DurationField';
 import { PriorityField } from '@/components/PriorityField';
 import { ReminderField } from '@/components/ReminderField';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { colors } from '@/constants/theme';
+import { parseDurationParam } from '@/lib/addSheetParams';
 import { isDateKey, isTimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 import { useTodos, type Priority } from '@/store/todos';
 
 /**
  * Bottom sheet for adding a todo (presented as a form sheet, see src/app/_layout.tsx).
- * Opens at half height and can be dragged to full screen. The form stays at the top, so it's
- * all visible at half height (on Android the content is laid out at full height either way).
+ * Opens at 60% height and can be dragged to full screen. The form stays at the top, so it's
+ * all visible at the starting height (on Android the content is laid out at full height either
+ * way).
  */
 export default function AddTodoScreen() {
   const router = useRouter();
@@ -54,16 +57,25 @@ export default function AddTodoScreen() {
   const [priority, setPriority] = useState<Priority>('medium');
   // Start on the day picked in the date strip, or today if that day is already past.
   const [initialDueDate] = useState(() => (selectedDate < todayKey ? todayKey : selectedDate));
-  // Set by the due-date and reminder sheets (src/app/due-date.tsx, src/app/reminder.tsx) when
-  // they close with a pick. See src/lib/addSheetParams.ts.
+  // Set by the due-date, reminder and duration sheets (src/app/due-date.tsx,
+  // src/app/reminder.tsx, src/app/duration.tsx) when they close with a pick. See
+  // src/lib/addSheetParams.ts.
   const {
     dueDate: pickedDueDate,
     dueTime: pickedDueTime,
     reminderTime: pickedReminderTime,
-  } = useLocalSearchParams<{ dueDate?: string; dueTime?: string; reminderTime?: string }>();
+    duration: pickedDuration,
+  } = useLocalSearchParams<{
+    dueDate?: string;
+    dueTime?: string;
+    reminderTime?: string;
+    duration?: string;
+  }>();
   const dueDate = isDateKey(pickedDueDate) ? pickedDueDate : initialDueDate;
   const dueTime = isTimeKey(pickedDueTime) ? pickedDueTime : undefined;
   const reminderTime = isTimeKey(pickedReminderTime) ? pickedReminderTime : undefined;
+  // In minutes.
+  const duration = parseDurationParam(pickedDuration);
 
   const canAdd = title.trim().length > 0;
 
@@ -75,6 +87,7 @@ export default function AddTodoScreen() {
       dueDate,
       dueTime,
       reminderTime,
+      duration,
       priority,
     });
     // Show the todo's day, so the new todo is visible in the list right away.
@@ -128,11 +141,28 @@ export default function AddTodoScreen() {
         />
       </View>
 
-      <DueDateField value={dueDate} time={dueTime} reminderTime={reminderTime} />
+      <DueDateField
+        value={dueDate}
+        time={dueTime}
+        reminderTime={reminderTime}
+        duration={duration}
+      />
 
       <PriorityField value={priority} onChange={setPriority} />
 
-      <ReminderField dueDate={dueDate} dueTime={dueTime} value={reminderTime} />
+      <DurationField
+        value={duration}
+        dueDate={dueDate}
+        dueTime={dueTime}
+        reminderTime={reminderTime}
+      />
+
+      <ReminderField
+        dueDate={dueDate}
+        dueTime={dueTime}
+        value={reminderTime}
+        duration={duration}
+      />
 
       <Pressable
         onPress={handleAdd}

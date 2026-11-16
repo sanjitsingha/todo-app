@@ -77,11 +77,16 @@ export function formatDayPhrase(key: DateKey, now = new Date()): string {
   return relativeDayLabel(key, now)?.toLowerCase() ?? `on ${absoluteDayLabel(key, now)}`;
 }
 
-/** For the screen header: "Today", "Yesterday", or the weekday in full, e.g. "Wednesday". */
-export function formatHeaderDay(key: DateKey, now = new Date()): string {
-  if (key === toDateKey(now)) return 'Today';
-  if (key === toDateKey(addDays(now, -1))) return 'Yesterday';
-  return WEEKDAYS_LONG[fromDateKey(key).getDay()];
+/**
+ * For the screen header: the month in full and the year's last two digits, e.g.
+ * { month: "November", year: "26" }. Kept apart so the year can be shown in a lighter color.
+ */
+export function headerMonth(key: DateKey): { month: string; year: string } {
+  const date = fromDateKey(key);
+  return {
+    month: MONTHS_LONG[date.getMonth()],
+    year: String(date.getFullYear() % 100).padStart(2, '0'),
+  };
 }
 
 export function isOverdue(key: DateKey, now = new Date()): boolean {
@@ -100,6 +105,20 @@ export function isDateKey(value: unknown): value is DateKey {
 /** "Wed, 12 Nov" (year added if not this year), never "Today" / "Tomorrow". */
 export function formatShortDate(key: DateKey, now = new Date()): string {
   return absoluteDayLabel(key, now);
+}
+
+/** "10 – 16 Nov", "28 Oct – 3 Nov", or "29 Dec 2026 – 4 Jan 2027" across a new year. */
+export function formatDayRange(from: DateKey, to: DateKey): string {
+  const start = fromDateKey(from);
+  const end = fromDateKey(to);
+  const endLabel = `${end.getDate()} ${MONTHS[end.getMonth()]}`;
+  if (start.getFullYear() !== end.getFullYear()) {
+    return `${start.getDate()} ${MONTHS[start.getMonth()]} ${start.getFullYear()} – ${endLabel} ${end.getFullYear()}`;
+  }
+  if (start.getMonth() !== end.getMonth()) {
+    return `${start.getDate()} ${MONTHS[start.getMonth()]} – ${endLabel}`;
+  }
+  return `${start.getDate()} – ${endLabel}`;
 }
 
 /** The coming Saturday, or today if it's already the weekend. */

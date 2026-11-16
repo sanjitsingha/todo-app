@@ -8,20 +8,22 @@ import { TodosProvider } from '@/store/todos';
 
 export default function RootLayout() {
   return (
-    // Needed for gestures from react-native-gesture-handler (the timeline's pinch to zoom).
+    // Needed for gestures from react-native-gesture-handler (swiping between days, the
+    // timeline's pinch to zoom).
     <GestureHandlerRootView style={styles.root}>
       <TodosProvider>
         <SelectedDateProvider>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            {/* Login, register and forgot password, opened from Settings. */}
+            {/* Login, register and forgot password, opened from Profile. */}
             <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-            {/* Starts at half height; drag up for full screen. */}
+            {/* Starts at 60% height, which fits the whole form down to the Add button (half
+                height cut it off once the Duration row came in); drag up for full screen. */}
             <Stack.Screen
               name="add"
               options={{
                 presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, 1],
+                sheetAllowedDetents: [0.6, 1],
                 sheetGrabberVisible: true,
                 sheetCornerRadius: 24,
                 headerShown: false,
@@ -44,6 +46,18 @@ export default function RootLayout() {
                 screen. */}
             <Stack.Screen
               name="reminder"
+              options={{
+                presentation: 'formSheet',
+                sheetAllowedDetents: [0.6, 1],
+                sheetGrabberVisible: true,
+                sheetCornerRadius: 24,
+                headerShown: false,
+              }}
+            />
+            {/* Opened from the Duration row of the add sheet, on top of it: hours and minutes
+                strips. The same size as the reminder sheet; drag up for full screen. */}
+            <Stack.Screen
+              name="duration"
               options={{
                 presentation: 'formSheet',
                 sheetAllowedDetents: [0.6, 1],

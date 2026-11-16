@@ -1,6 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRef, useState } from 'react';
 import {
+  Keyboard,
   Modal,
   Pressable,
   StyleSheet,
@@ -32,7 +33,21 @@ type Props<T extends string> = {
 
 type Anchor = { x: number; y: number; width: number; height: number };
 
-/** A button showing the current choice. Tapping it opens a menu of options right below it. */
+/** Space between the button and its menu. */
+const MENU_GAP = 6;
+/** The menu never comes closer than this to the top or bottom of the screen. */
+const SCREEN_MARGIN = 16;
+// The menu's padding and row height (used in its styles), to tell whether it fits below.
+const ITEM_HEIGHT = 44;
+const MENU_PADDING = 6;
+/** If the keyboard says it's gone but never does, open the menu anyway after this long. */
+const KEYBOARD_WAIT_MS = 500;
+
+/**
+ * A button showing the current choice. Tapping it opens a menu of options right below it, or
+ * right above it when there isn't room below (a button low on the screen, like one in a
+ * half-height sheet).
+ */
 export function Dropdown<T extends string>({
   value,
   options,
@@ -40,20 +55,49 @@ export function Dropdown<T extends string>({
   accessibilityLabel,
   align = 'left',
 }: Props<T>) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const triggerRef = useRef<PressableInstance>(null);
   const [isOpen, setIsOpen] = useState(false);
   // Kept after closing, so the menu stays in place while it fades out.
   const [anchor, setAnchor] = useState<Anchor | null>(null);
+  // The full-screen layer the menu sits in, once laid out; a menu above the button is placed
+  // from its bottom edge.
+  const [layerHeight, setLayerHeight] = useState(windowHeight);
 
   const selected = options.find((option) => option.value === value);
 
-  const open = () => {
+  const measureAndOpen = () => {
     triggerRef.current?.measureInWindow((x, y, width, height) => {
       setAnchor({ x, y, width, height });
       setIsOpen(true);
     });
   };
+
+  const open = () => {
+    if (!Keyboard.isVisible()) {
+      measureAndOpen();
+      return;
+    }
+    // A sheet moves back down as the keyboard goes, taking the button with it, so the menu is
+    // placed once the keyboard is gone.
+    let fallback: ReturnType<typeof setTimeout> | undefined;
+    const subscription = Keyboard.addListener('keyboardDidHide', () => {
+      subscription.remove();
+      clearTimeout(fallback);
+      requestAnimationFrame(measureAndOpen);
+    });
+    fallback = setTimeout(() => {
+      subscription.remove();
+      measureAndOpen();
+    }, KEYBOARD_WAIT_MS);
+    Keyboard.dismiss();
+  };
+
+  const menuHeight = options.length * ITEM_HEIGHT + MENU_PADDING * 2;
+  const opensUp =
+    anchor !== null &&
+    anchor.y + anchor.height + MENU_GAP + menuHeight > layerHeight - SCREEN_MARGIN &&
+    anchor.y - MENU_GAP - menuHeight >= SCREEN_MARGIN;
 
   const close = () => setIsOpen(false);
 
@@ -85,12 +129,19 @@ export function Dropdown<T extends string>({
         statusBarTranslucent
         navigationBarTranslucent
       >
-        <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close menu" />
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={close}
+          onLayout={(event) => setLayerHeight(event.nativeEvent.layout.height)}
+          accessibilityLabel="Close menu"
+        />
         {anchor ? (
           <View
             style={[
               styles.menu,
-              { top: anchor.y + anchor.height + 6 },
+              opensUp
+                ? { bottom: layerHeight - anchor.y + MENU_GAP }
+                : { top: anchor.y + anchor.height + MENU_GAP },
               align === 'right'
                 ? { right: windowWidth - (anchor.x + anchor.width) }
                 : { left: anchor.x },
@@ -143,7 +194,7 @@ const styles = StyleSheet.create({
   menu: {
     position: 'absolute',
     minWidth: 180,
-    paddingVertical: 6,
+    paddingVertical: MENU_PADDING,
     borderRadius: 12,
     backgroundColor: colors.surface,
     elevation: 8,
@@ -153,7 +204,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
   },
   item: {
-    minHeight: 44,
+    minHeight: ITEM_HEIGHT,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
