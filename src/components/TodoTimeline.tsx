@@ -1,25 +1,20 @@
-import { useRouter } from 'expo-router';
-import {
-  useEffect,
-  useEffectEvent,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type ScrollViewInstance,
-} from 'react-native';
+import { useNavigation, useRoute, useRouter } from 'expo-router';
+import { memo, useEffect, useEffectEvent, useMemo, useState, type ReactNode } from 'react';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   GestureDetector,
   ScrollView as GestureScrollView,
   usePinchGesture,
 } from 'react-native-gesture-handler';
+import Animated, {
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useScrollOffset,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
+import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 
 import { priorityOf } from '@/components/TodoChips';
 import { colors } from '@/constants/theme';
@@ -27,101 +22,92 @@ import { useNow } from '@/hooks/useNow';
 import { formatTime, toDateKey, toDayMinutes, type DateKey } from '@/lib/dates';
 import type { Todo } from '@/store/todos';
 
-/** How tall an hour is, in points: fully zoomed out, at first, and fully zoomed in. */
+/**
+ * How tall an hour is, in points: fully zoomed out, at first, and fully zoomed in. Zooming only
+ * stretches the hours; the labels stay one per hour.
+ */
 const MIN_HOUR_HEIGHT = 48;
 const DEFAULT_HOUR_HEIGHT = 64;
-const MAX_HOUR_HEIGHT = 480;
-/**
- * Time labels down the left get finer as you zoom in: every hour, 30 minutes, 15 minutes, then
- * 5 minutes. Each step shows once its labels are at least this far apart.
- */
-const MIN_LABEL_GAP = 36;
-const DIVISIONS = [5, 15, 30] as const;
+const MAX_HOUR_HEIGHT = 240;
+/** The hours of the day, one label and line each. */
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 /** Room on the left for the time labels. */
 const GUTTER_WIDTH = 56;
 /** Space above 12 am, so its label isn't cut off. */
 const GRID_TOP = 10;
-/** A todo has a time but no length, so each block is at least half an hour tall. */
+/** A todo has a time but no length, so a block reaches at most half an hour down. */
 const BLOCK_MINUTES = 30;
-/** Space between blocks side by side, and below each one. */
+/** Space below each block, so stacked blocks don't touch. */
 const BLOCK_GAP = 2;
-/** How much of the day shows above the time the timeline opens at. */
-const LEAD_MINUTES = 60;
+/** How tall a one-line title is, used until a block has been measured. */
+const ONE_LINE_HEIGHT = 28;
+/**
+ * How much of the day shows above the time the timeline opens at: on today, the red now line
+ * sits near the top with two hours above it.
+ */
+const LEAD_MINUTES = 120;
 
 // The zoom is kept while the app is open, so switching views or days doesn't reset it.
 let savedHourHeight = DEFAULT_HOUR_HEIGHT;
 
-/** Minutes between time labels at this zoom: the finest step whose labels still fit. */
-function divisionFor(hourHeight: number): number {
-  return DIVISIONS.find((step) => (step / 60) * hourHeight >= MIN_LABEL_GAP) ?? 60;
-}
+/** Gesture handler's scroll view (so it can scroll alongside the pinch), driven by Reanimated. */
+const AnimatedScrollView = Animated.createAnimatedComponent(GestureScrollView);
 
-/** "9 am" on the hour, "9:30" between hours. */
-function tickLabel(minutes: number): string {
-  const hour = Math.floor(minutes / 60);
-  const minute = minutes % 60;
-  const hour12 = hour % 12 || 12;
-  return minute === 0
-    ? `${hour12} ${hour < 12 ? 'am' : 'pm'}`
-    : `${hour12}:${String(minute).padStart(2, '0')}`;
+/** "12 am", "9 am", "3 pm". */
+function hourLabel(hour: number): string {
+  return `${hour % 12 || 12} ${hour < 12 ? 'am' : 'pm'}`;
 }
 
 /** Distance from the top of the grid to a time of day. */
 function offsetOf(minutes: number, hourHeight: number): number {
+  'worklet';
   return GRID_TOP + (minutes / 60) * hourHeight;
 }
 
 function clamp(value: number, min: number, max: number): number {
+  'worklet';
   return Math.min(Math.max(value, min), max);
 }
 
-type Block = {
-  todo: Todo;
-  /** Minutes since midnight. */
-  start: number;
-  /** Side-by-side position among blocks that overlap on screen: column of columns. */
-  column: number;
-  columns: number;
-};
+/** A todo with a time, in the order the timeline shows them. */
+type TimedTodo = { todo: Todo; start: number };
+
+/** What laying out a block needs: its time (minutes since midnight) and its title's height. */
+type BlockInput = { start: number; contentHeight: number };
 
 /**
- * Places the todos that have a time, like a calendar's day view: blocks that overlap share
- * the width, each in the leftmost column that's free at its start. `endOf` says where a
- * block ends, in minutes (it can be taller than half an hour when its title wraps).
+ * Where block `index` goes at this zoom: its distance from the top of the grid and its height
+ * (gap included), in points. Blocks go down the timeline full width, one below another. Each
+ * starts at its time and reaches down to the next todo's time (at most half an hour), but is
+ * never shorter than its title. When todos are too close for that, the later ones are pushed
+ * down to sit right under the one before, so they stack instead of going side by side. Zoomed
+ * in far enough, every block is at its exact time.
+ *
+ * A block's place depends on the ones above it, so this walks down from the first. It runs on
+ * the UI thread on every frame of a pinch, for a handful of blocks, so that's cheap.
  */
-function layoutBlocks(todos: readonly Todo[], endOf: (todo: Todo, start: number) => number) {
-  const timed = todos
-    .filter((todo): todo is Todo & { dueTime: string } => todo.dueTime !== undefined)
-    .map((todo) => ({ todo, start: toDayMinutes(todo.dueTime) }))
-    .sort((a, b) => a.start - b.start || a.todo.createdAt - b.todo.createdAt);
-
-  const blocks: Block[] = [];
-  // The current run of overlapping blocks, and where each of its columns is free again.
-  let group: Block[] = [];
-  let columnEnds: number[] = [];
-  let groupEnd = -1;
-
-  const closeGroup = () => {
-    for (const block of group) block.columns = columnEnds.length;
-    group = [];
-    columnEnds = [];
-  };
-
-  for (const { todo, start } of timed) {
-    if (start >= groupEnd) closeGroup();
-    const end = endOf(todo, start);
-    let column = columnEnds.findIndex((columnEnd) => columnEnd <= start);
-    if (column === -1) column = columnEnds.length;
-    columnEnds[column] = end;
-    groupEnd = Math.max(groupEnd, end);
-
-    const block = { todo, start, column, columns: 1 };
-    group.push(block);
-    blocks.push(block);
+function blockPosition(
+  inputs: readonly BlockInput[],
+  index: number,
+  hourHeight: number,
+): { top: number; height: number } {
+  'worklet';
+  let top = 0;
+  let height = 0;
+  let previousBottom = 0;
+  for (let i = 0; i <= index; i++) {
+    const { start, contentHeight } = inputs[i];
+    const next = inputs[i + 1];
+    top = Math.max(offsetOf(start, hourHeight), previousBottom);
+    const end = Math.min(
+      offsetOf(start + BLOCK_MINUTES, hourHeight),
+      next ? offsetOf(next.start, hourHeight) : Infinity,
+    );
+    height = Math.max(contentHeight + BLOCK_GAP, end - top);
+    previousBottom = top + height;
   }
-  closeGroup();
-  return blocks;
+  return { top, height };
 }
 
 type Props = {
@@ -136,10 +122,14 @@ type Props = {
  * with a time as a block at that time, tinted by priority. Todos without a time sit in an
  * "All day" row above. On today, a red line marks the current time.
  *
- * Pinch to zoom: the hours stretch, and the time labels go from every hour down to every 5
- * minutes. The time under your fingers stays put while zooming.
- * Opens scrolled to just before now (today), or the first todo with a time, or 8 am.
+ * Pinch to zoom: the hours stretch apart or squeeze together, with a label on each hour, and
+ * the time under your fingers stays put. It all runs on the UI thread, so it follows your
+ * fingers frame by frame: the zoom is a shared value that the hours, blocks and now line read
+ * directly, without React re-rendering.
+ * Opens with two hours showing above now (today), or above the first todo with a time, or
+ * above 8 am, and goes back there after the app or another tab has been in front.
  * Tapping a todo opens its details sheet. Titles wrap in full; a block grows to fit its title.
+ * Todos close together stack one below another.
  */
 export function TodoTimeline({ todos, date }: Props) {
   const router = useRouter();
@@ -147,88 +137,138 @@ export function TodoTimeline({ todos, date }: Props) {
   const isToday = date === toDateKey(now);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-  const [hourHeight, setHourHeight] = useState(savedHourHeight);
-  const division = divisionFor(hourHeight);
-  const ticks = useMemo(
-    () => Array.from({ length: (24 * 60) / division }, (_, i) => i * division),
-    [division],
-  );
+  const hourHeight = useSharedValue(savedHourHeight);
 
-  // How tall each block's title and time are, as laid out. A block that's taller than half an
-  // hour takes up more of the timeline, so blocks below it move aside instead of covering it.
+  // How tall each block's title and time are, as laid out. A block is never shorter than its
+  // title, so a block that needs more room pushes the ones after it down.
   const [contentHeights, setContentHeights] = useState<Record<string, number>>({});
   const measureBlock = (id: string, height: number) =>
     setContentHeights((current) =>
       Math.abs((current[id] ?? 0) - height) < 1 ? current : { ...current, [id]: height },
     );
 
-  const blocks = useMemo(
-    () =>
-      layoutBlocks(todos, (todo, start) => {
-        const height = (contentHeights[todo.id] ?? 0) + BLOCK_GAP;
-        return start + Math.max(BLOCK_MINUTES, (height / hourHeight) * 60);
-      }),
-    [todos, contentHeights, hourHeight],
+  const timed = useMemo(
+    (): TimedTodo[] =>
+      todos
+        .filter((todo): todo is Todo & { dueTime: string } => todo.dueTime !== undefined)
+        .map((todo) => ({ todo, start: toDayMinutes(todo.dueTime) }))
+        .sort((a, b) => a.start - b.start || a.todo.createdAt - b.todo.createdAt),
+    [todos],
+  );
+  const blockInputs = useMemo(
+    (): BlockInput[] =>
+      timed.map(({ todo, start }) => ({
+        start,
+        contentHeight: contentHeights[todo.id] ?? ONE_LINE_HEIGHT,
+      })),
+    [timed, contentHeights],
   );
   const allDay = todos.filter((todo) => todo.dueTime === undefined);
+
+  // Todos stacked late in the day can run past midnight; the grid grows to keep them in reach.
+  const gridHeight = useAnimatedStyle(() => {
+    const height = hourHeight.get();
+    const last = blockInputs.length - 1;
+    const lastBlock = last >= 0 ? blockPosition(blockInputs, last, height) : null;
+    return {
+      height: Math.max(offsetOf(24 * 60, height), lastBlock ? lastBlock.top + lastBlock.height : 0),
+    };
+  });
 
   const openTodo = (todo: Todo) =>
     router.push({ pathname: '/todo/[id]', params: { id: todo.id } });
 
-  const scrollRef = useRef<ScrollViewInstance>(null);
-  const scrollY = useRef(0);
+  const scrollRef = useAnimatedRef();
+  const scrollOffset = useScrollOffset(scrollRef);
 
   // Scroll to where the day starts once the timeline is on screen, and again for each new day.
+  // The time is read fresh here: coming back from the background, `now` hasn't caught up yet.
   const [laidOut, setLaidOut] = useState(false);
   const scrollToStart = useEffectEvent(() => {
-    const start = isToday ? nowMinutes : (blocks[0]?.start ?? 8 * 60);
-    const y = Math.max(offsetOf(start - LEAD_MINUTES, hourHeight), 0);
-    scrollRef.current?.scrollTo({ y, animated: false });
+    const current = new Date();
+    const start =
+      date === toDateKey(current)
+        ? current.getHours() * 60 + current.getMinutes()
+        : (timed[0]?.start ?? 8 * 60);
+    const y = Math.max(offsetOf(start - LEAD_MINUTES, hourHeight.get()), 0);
+    scheduleOnUI(() => {
+      'worklet';
+      scrollTo(scrollRef, 0, y, false);
+    });
   });
   useEffect(() => {
     if (laidOut) scrollToStart();
   }, [date, laidOut]);
 
-  // Pinch to zoom. The time under the fingers when the pinch starts stays under them: after
-  // each zoom step, the timeline scrolls to put it back there.
-  const [pinching, setPinching] = useState(false);
-  const zoom = useRef({ startHeight: hourHeight, anchorMinutes: 0, focalY: 0, pending: false });
-  const latestHourHeight = useRef(hourHeight);
+  // Back to that start whenever the timeline comes back into sight: the app returning from the
+  // background, or the Todo tab after another tab. Closing a sheet opened on top of it (add,
+  // todo details) keeps your place, the same way the date strip keeps the picked day.
+  const navigation = useNavigation();
+  const route = useRoute();
   useEffect(() => {
-    latestHourHeight.current = hourHeight;
-    savedHourHeight = hourHeight;
-  }, [hourHeight]);
+    let wentToBackground = false;
+    let wentToOtherTab = false;
+
+    const appState = AppState.addEventListener('change', (state) => {
+      if (state === 'background') {
+        wentToBackground = true;
+      } else if (state === 'active' && wentToBackground) {
+        wentToBackground = false;
+        scrollToStart();
+      }
+    });
+    // A sheet on top leaves this tab the active one; another tab doesn't.
+    const removeBlur = navigation.addListener('blur', () => {
+      const tabs = navigation.getState();
+      wentToOtherTab = tabs !== undefined && tabs.routes[tabs.index]?.key !== route.key;
+    });
+    const removeFocus = navigation.addListener('focus', () => {
+      if (!wentToOtherTab) return;
+      wentToOtherTab = false;
+      scrollToStart();
+    });
+
+    return () => {
+      appState.remove();
+      removeBlur();
+      removeFocus();
+    };
+  }, [navigation, route.key]);
+
+  // Pinch to zoom, on the UI thread. The time under the fingers when the pinch starts stays at
+  // that spot on screen: each frame sets the new hour height and scrolls to put that time back
+  // there. The spot is fixed at the start, not the moving midpoint of the fingers: when one
+  // finger lifts before the other, the midpoint jumps to the finger left behind, and following
+  // it would throw the timeline. Updates with fewer than two fingers down are ignored too.
+  // React isn't involved at all; the zoom is only saved when the pinch ends.
+  const pinchStartHeight = useSharedValue(savedHourHeight);
+  const pinchAnchorMinutes = useSharedValue(0);
+  const pinchFocalY = useSharedValue(0);
+  const saveZoom = (height: number) => {
+    savedHourHeight = height;
+  };
 
   const pinch = usePinchGesture({
-    runOnJS: true,
-    disableReanimated: true,
     onActivate: (event) => {
-      const height = latestHourHeight.current;
-      zoom.current = {
-        startHeight: height,
-        anchorMinutes: ((scrollY.current + event.focalY - GRID_TOP) / height) * 60,
-        focalY: event.focalY,
-        pending: false,
-      };
-      setPinching(true);
+      'worklet';
+      const height = hourHeight.get();
+      pinchStartHeight.set(height);
+      pinchFocalY.set(event.focalY);
+      pinchAnchorMinutes.set(((scrollOffset.get() + event.focalY - GRID_TOP) / height) * 60);
     },
     onUpdate: (event) => {
-      zoom.current.focalY = event.focalY;
-      zoom.current.pending = true;
-      setHourHeight(
-        clamp(zoom.current.startHeight * event.scale, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT),
-      );
+      'worklet';
+      if (event.numberOfPointers < 2) return;
+      const height = clamp(pinchStartHeight.get() * event.scale, MIN_HOUR_HEIGHT, MAX_HOUR_HEIGHT);
+      hourHeight.set(height);
+      const y = Math.max(offsetOf(pinchAnchorMinutes.get(), height) - pinchFocalY.get(), 0);
+      scrollTo(scrollRef, 0, y, false);
     },
-    onFinalize: () => setPinching(false),
+    onFinalize: () => {
+      'worklet';
+      scheduleOnRN(saveZoom, hourHeight.get());
+    },
   });
-
-  useLayoutEffect(() => {
-    const { anchorMinutes, focalY, pending } = zoom.current;
-    if (!pending) return;
-    zoom.current.pending = false;
-    const y = Math.max(offsetOf(anchorMinutes, hourHeight) - focalY, 0);
-    scrollRef.current?.scrollTo({ y, animated: false });
-  }, [hourHeight]);
 
   return (
     <View style={styles.container}>
@@ -244,48 +284,29 @@ export function TodoTimeline({ todos, date }: Props) {
       ) : null}
 
       <GestureDetector gesture={pinch}>
-        <GestureScrollView
+        <AnimatedScrollView
           ref={scrollRef}
-          simultaneousWith={pinch}
-          // The pinch moves the timeline itself, so the usual scrolling waits until it's done.
-          scrollEnabled={!pinching}
+          // A pinch takes over from scrolling: the scroll view's drag is cancelled the moment the
+          // pinch starts, so it doesn't fight the zoom, fling afterwards, or jump when one finger
+          // stays down after the other lifts. The next touch scrolls as usual.
+          yieldsToContinuousGestures
           onLayout={() => setLaidOut(true)}
-          onScroll={(event) => {
-            scrollY.current = event.nativeEvent.contentOffset.y;
-          }}
           scrollEventThrottle={16}
           contentContainerStyle={styles.gridContent}
         >
-          <View style={{ height: offsetOf(24 * 60, hourHeight) }}>
-            {ticks.map((minutes) => {
-              const onHour = minutes % 60 === 0;
-              return (
-                <View
-                  key={minutes}
-                  style={[styles.tickRow, { top: offsetOf(minutes, hourHeight) - 8 }]}
-                >
-                  <Text style={[styles.tickLabel, !onHour && styles.tickLabelMinor]}>
-                    {tickLabel(minutes)}
-                  </Text>
-                  <View style={[styles.tickLine, !onHour && styles.tickLineMinor]} />
-                </View>
-              );
-            })}
+          <Animated.View style={gridHeight}>
+            {HOURS.map((hour) => (
+              <HourRow key={hour} hour={hour} hourHeight={hourHeight} />
+            ))}
 
-            {/* Blocks go in the area right of the labels; percentages split its width. */}
+            {/* Blocks go in the area right of the labels, across its full width. */}
             <View style={styles.blocks}>
-              {blocks.map(({ todo, start, column, columns }) => (
-                <View
+              {timed.map(({ todo }, index) => (
+                <TimelineBlock
                   key={todo.id}
-                  style={[
-                    styles.blockSlot,
-                    {
-                      top: offsetOf(start, hourHeight) - GRID_TOP,
-                      minHeight: (BLOCK_MINUTES / 60) * hourHeight,
-                      left: `${(column / columns) * 100}%`,
-                      width: `${100 / columns}%`,
-                    },
-                  ]}
+                  inputs={blockInputs}
+                  index={index}
+                  hourHeight={hourHeight}
                 >
                   <TimelineChip
                     todo={todo}
@@ -294,31 +315,84 @@ export function TodoTimeline({ todos, date }: Props) {
                     showTime
                     fill
                   />
-                </View>
+                </TimelineBlock>
               ))}
             </View>
 
-            {isToday ? (
-              <View
-                style={[styles.nowLine, { top: offsetOf(nowMinutes, hourHeight) - 4 }]}
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
-              >
-                <View style={styles.nowDot} />
-                <View style={styles.nowRule} />
-              </View>
-            ) : null}
-          </View>
-        </GestureScrollView>
+            {isToday ? <NowLine minutes={nowMinutes} hourHeight={hourHeight} /> : null}
+          </Animated.View>
+        </AnimatedScrollView>
       </GestureDetector>
     </View>
   );
 }
 
 /**
- * One todo on the timeline: a tinted box with a priority-colored edge, and the title in full
- * (it wraps). `fill` stretches it to its block; `showTime` adds the time after the title.
- * `onContentHeight` reports how tall the title and time are.
+ * One hour's label and line. It moves with a transform rather than `top`, so zooming doesn't
+ * make the layout recalculate for every row on every frame.
+ */
+const HourRow = memo(function HourRow({
+  hour,
+  hourHeight,
+}: {
+  hour: number;
+  hourHeight: SharedValue<number>;
+}) {
+  const position = useAnimatedStyle(() => ({
+    transform: [{ translateY: offsetOf(hour * 60, hourHeight.get()) - 8 }],
+  }));
+
+  return (
+    <Animated.View style={[styles.tickRow, position]}>
+      <Text style={styles.tickLabel}>{hourLabel(hour)}</Text>
+      <View style={styles.tickLine} />
+    </Animated.View>
+  );
+});
+
+/** Holds one todo's block at its place on the timeline, following the zoom. */
+function TimelineBlock({
+  inputs,
+  index,
+  hourHeight,
+  children,
+}: {
+  inputs: readonly BlockInput[];
+  index: number;
+  hourHeight: SharedValue<number>;
+  children: ReactNode;
+}) {
+  const position = useAnimatedStyle(() => {
+    const { top, height } = blockPosition(inputs, index, hourHeight.get());
+    return { height, transform: [{ translateY: top - GRID_TOP }] };
+  });
+
+  return <Animated.View style={[styles.blockSlot, position]}>{children}</Animated.View>;
+}
+
+/** The current time: a dot on the edge of the time labels and a line across. */
+function NowLine({ minutes, hourHeight }: { minutes: number; hourHeight: SharedValue<number> }) {
+  const position = useAnimatedStyle(() => ({
+    transform: [{ translateY: offsetOf(minutes, hourHeight.get()) - 4 }],
+  }));
+
+  return (
+    <Animated.View
+      style={[styles.nowLine, position]}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+    >
+      <View style={styles.nowDot} />
+      <View style={styles.nowRule} />
+    </Animated.View>
+  );
+}
+
+/**
+ * One todo on the timeline: a box tinted by priority, with the title in full (it wraps) in a
+ * deep shade of the same color. Done todos are gray. `fill` stretches it to its block;
+ * `showTime` puts the time on the right. `onContentHeight` reports how tall the title and time
+ * are.
  */
 function TimelineChip({
   todo,
@@ -342,9 +416,7 @@ function TimelineChip({
       style={({ pressed }) => [
         styles.chip,
         fill && styles.chipFill,
-        todo.completed
-          ? styles.chipCompleted
-          : { backgroundColor: priority.background, borderLeftColor: priority.color },
+        todo.completed ? styles.chipCompleted : { backgroundColor: priority.background },
         pressed && styles.chipPressed,
       ]}
       accessibilityRole="button"
@@ -361,12 +433,22 @@ function TimelineChip({
             : undefined
         }
       >
-        <Text style={styles.chipText}>
-          <Text style={[styles.chipTitle, todo.completed && styles.chipTitleCompleted]}>
-            {todo.title}
-          </Text>
-          {time ? <Text style={styles.chipTime}>{`  ${time}`}</Text> : null}
+        <Text
+          style={[
+            styles.chipText,
+            styles.chipTitle,
+            todo.completed ? styles.chipTitleCompleted : { color: priority.deep },
+          ]}
+        >
+          {todo.title}
         </Text>
+        {time ? (
+          <Text
+            style={[styles.chipText, styles.chipTime, !todo.completed && { color: priority.deep }]}
+          >
+            {time}
+          </Text>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -405,9 +487,10 @@ const styles = StyleSheet.create({
   gridContent: {
     paddingBottom: 64,
   },
-  // A label centered on its time's line.
+  // A label centered on its time's line; moved down to it with a transform.
   tickRow: {
     position: 'absolute',
+    top: 0,
     left: 0,
     right: 0,
     height: 16,
@@ -421,19 +504,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
   },
-  // Between hours: smaller and lighter, so the hours still stand out.
-  tickLabelMinor: {
-    fontSize: 10,
-    color: colors.textSubtle,
-  },
   tickLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
     marginEnd: 16,
     backgroundColor: colors.border,
-  },
-  tickLineMinor: {
-    backgroundColor: colors.inputBackground,
   },
   blocks: {
     position: 'absolute',
@@ -442,35 +517,41 @@ const styles = StyleSheet.create({
     left: GUTTER_WIDTH,
     right: 16,
   },
-  // At least half an hour tall; taller if the title needs more lines.
+  // Full width; its place and height (gap included) come from blockPosition.
   blockSlot: {
     position: 'absolute',
-    paddingEnd: BLOCK_GAP,
+    top: 0,
+    left: 0,
+    right: 0,
     paddingBottom: BLOCK_GAP,
   },
   chip: {
     borderRadius: 6,
-    borderLeftWidth: 3,
   },
   chipFill: {
     flexGrow: 1,
   },
+  // The title on the left, wrapping; the time at the top right.
   chipContent: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
     paddingHorizontal: 8,
     paddingVertical: 5,
   },
   chipCompleted: {
     backgroundColor: colors.inputBackground,
-    borderLeftColor: colors.textSubtle,
   },
   chipPressed: {
     opacity: 0.7,
   },
+  // The same line height for title and time, so the time lines up with the title's first line.
   chipText: {
-    fontSize: 12,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   chipTitle: {
+    flex: 1,
+    fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
@@ -479,11 +560,14 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   chipTime: {
+    flexShrink: 0,
+    fontSize: 12,
     color: colors.textMuted,
   },
-  // The current time: a dot on the edge of the time labels and a line across.
+  // Moved down to the current time with a transform.
   nowLine: {
     position: 'absolute',
+    top: 0,
     left: GUTTER_WIDTH - 4,
     right: 16,
     height: 8,

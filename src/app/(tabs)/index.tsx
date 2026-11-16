@@ -6,11 +6,12 @@ import { CompletedSection } from '@/components/CompletedSection';
 import { DateHeader } from '@/components/DateHeader';
 import { DateStrip } from '@/components/DateStrip';
 import { Dropdown, type DropdownOption } from '@/components/Dropdown';
+import { GoalRing } from '@/components/GoalRing';
 import { ScreenPlaceholder, type IconName } from '@/components/ScreenPlaceholder';
 import { TodoItem } from '@/components/TodoItem';
 import { TodoTimeline } from '@/components/TodoTimeline';
 import { colors } from '@/constants/theme';
-import { formatDayPhrase, fromDateKey } from '@/lib/dates';
+import { formatDayPhrase } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 import { updateSettings, useSettings } from '@/store/settings';
 import { useTodos, type Todo } from '@/store/todos';
@@ -115,7 +116,18 @@ export default function TodoScreen() {
 
   return (
     <View style={styles.screen}>
-      <DateHeader date={fromDateKey(selectedDate)} action={timelineButton} />
+      <DateHeader
+        date={selectedDate}
+        today={today}
+        // Every todo due that day, whatever the filter shows.
+        accessory={
+          <GoalRing
+            total={pendingTodos.length + completedTodos.length}
+            done={completedTodos.length}
+          />
+        }
+        action={timelineButton}
+      />
       <DateStrip today={today} selectedDate={selectedDate} onSelectDate={selectDate} />
 
       {/* Everything below the date strip sits on plain white. */}

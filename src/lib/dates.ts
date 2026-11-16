@@ -77,6 +77,13 @@ export function formatDayPhrase(key: DateKey, now = new Date()): string {
   return relativeDayLabel(key, now)?.toLowerCase() ?? `on ${absoluteDayLabel(key, now)}`;
 }
 
+/** For the screen header: "Today", "Yesterday", or the weekday in full, e.g. "Wednesday". */
+export function formatHeaderDay(key: DateKey, now = new Date()): string {
+  if (key === toDateKey(now)) return 'Today';
+  if (key === toDateKey(addDays(now, -1))) return 'Yesterday';
+  return WEEKDAYS_LONG[fromDateKey(key).getDay()];
+}
+
 export function isOverdue(key: DateKey, now = new Date()): boolean {
   return key < toDateKey(now);
 }

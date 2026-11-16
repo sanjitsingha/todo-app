@@ -17,12 +17,18 @@ export const colors = {
   textSubtle: '#94A3B8',
   iconInactive: '#94A3B8',
   danger: '#DC2626',
+  /** Green for "all done", like the full goal ring. */
+  success: '#16A34A',
   /** Tinted backgrounds and their text colors, used for the priority options and date chips. */
   dangerSoft: '#FEE2E2',
   amberSoft: '#FEF3C7',
   amberDark: '#B45309',
   skySoft: '#E0F2FE',
   skyDark: '#0369A1',
+  /** Deep shades of the soft backgrounds above, for text that sits on them. */
+  dangerDeep: '#991B1B',
+  amberDeep: '#92400E',
+  skyDeep: '#075985',
   sunSoft: '#FEF9C3',
   sunDark: '#A16207',
   inkSoft: '#E5E7EB',

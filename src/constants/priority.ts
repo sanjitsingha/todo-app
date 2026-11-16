@@ -9,8 +9,28 @@ export const PRIORITIES: readonly {
   color: string;
   /** Tinted background behind the label when it's picked. */
   background: string;
+  /** A deep shade of `background`, for text on it, like a todo's title on the timeline. */
+  deep: string;
 }[] = [
-  { value: 'high', label: 'High', color: colors.danger, background: colors.dangerSoft },
-  { value: 'medium', label: 'Medium', color: colors.amberDark, background: colors.amberSoft },
-  { value: 'low', label: 'Low', color: colors.skyDark, background: colors.skySoft },
+  {
+    value: 'high',
+    label: 'High',
+    color: colors.danger,
+    background: colors.dangerSoft,
+    deep: colors.dangerDeep,
+  },
+  {
+    value: 'medium',
+    label: 'Medium',
+    color: colors.amberDark,
+    background: colors.amberSoft,
+    deep: colors.amberDeep,
+  },
+  {
+    value: 'low',
+    label: 'Low',
+    color: colors.skyDark,
+    background: colors.skySoft,
+    deep: colors.skyDeep,
+  },
 ];
