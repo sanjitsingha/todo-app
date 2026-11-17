@@ -121,7 +121,7 @@ function blockPosition(
 }
 
 type Props = {
-  /** The picked day's todos (already filtered by status). */
+  /** The picked day's todos. */
   todos: readonly Todo[];
   /** The picked day. */
   date: DateKey;

@@ -34,6 +34,13 @@ const PAGE_OPTIONS = {
   sceneStyle: { backgroundColor: colors.surface },
 } as const;
 
+/** The same, on a very light gray (the gray behind the Todo tab's date strip). */
+const GRAY_PAGE_OPTIONS = {
+  ...PAGE_OPTIONS,
+  headerStyle: { backgroundColor: colors.background },
+  sceneStyle: { backgroundColor: colors.background },
+} as const;
+
 export default function TabsLayout() {
   return (
     <Tabs
@@ -42,7 +49,7 @@ export default function TabsLayout() {
     >
       {/* The Todo screen draws its own date header (src/components/DateHeader.tsx). */}
       <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false }} />
-      <Tabs.Screen name="stats" options={{ title: 'Stats', ...PAGE_OPTIONS }} />
+      <Tabs.Screen name="stats" options={{ title: 'Stats', ...GRAY_PAGE_OPTIONS }} />
       <Tabs.Screen name="profile" options={{ title: 'Profile', ...PAGE_OPTIONS }} />
     </Tabs>
   );

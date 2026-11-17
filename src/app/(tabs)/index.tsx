@@ -8,8 +8,7 @@ import { useSharedValue } from 'react-native-reanimated';
 import { DateHeader } from '@/components/DateHeader';
 import { DateStrip } from '@/components/DateStrip';
 import { DayPager } from '@/components/DayPager';
-import { DayTodos, useDayTodos, type StatusFilter } from '@/components/DayTodos';
-import { Dropdown, type DropdownOption } from '@/components/Dropdown';
+import { DayTodos, useDayTodos } from '@/components/DayTodos';
 import { GoalRing } from '@/components/GoalRing';
 import { colors } from '@/constants/theme';
 import type { DateKey } from '@/lib/dates';
@@ -29,20 +28,13 @@ const LUCIDE_STROKE = 2;
 const GALLERY_ICON_SIZE = VIEW_ICON_SIZE * (ROWS_ICON_UNITS / GALLERY_ICON_UNITS);
 const GALLERY_STROKE = LUCIDE_STROKE * (VIEW_ICON_SIZE / GALLERY_ICON_SIZE);
 
-const FILTER_OPTIONS: DropdownOption<StatusFilter>[] = [
-  { value: 'all', label: 'All todos' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'completed', label: 'Completed' },
-];
-
 export default function TodoScreen() {
   const { today, selectedDate, selectDate } = useSelectedDate();
-  const [filter, setFilter] = useState<StatusFilter>('all');
   // List or timeline; remembered between launches.
   const { todoView } = useSettings();
   const showTimeline = todoView === 'timeline';
 
-  // For the goal ring: every todo due on the picked day, whatever the filter shows.
+  // For the goal ring: every todo due on the picked day.
   const { pendingTodos, completedTodos } = useDayTodos(selectedDate);
 
   // Where a swipe of the day pager has got to, for the date strip to move along with it.
@@ -64,11 +56,10 @@ export default function TodoScreen() {
       <DayTodos
         date={date}
         today={today}
-        filter={filter}
         showTimeline={date === selectedDate ? pageShowsTimeline : besideShowsTimeline}
       />
     ),
-    [today, filter, selectedDate, pageShowsTimeline, besideShowsTimeline],
+    [today, selectedDate, pageShowsTimeline, besideShowsTimeline],
   );
 
   const timelineButton = (
@@ -112,18 +103,9 @@ export default function TodoScreen() {
         follow={swipePosition}
       />
 
-      {/* Everything below the date strip sits on plain white. The filter stays put; the day's
-          todos below it swipe sideways to the next or previous day. */}
+      {/* Everything below the date strip sits on plain white. The day's todos swipe sideways
+          to the next or previous day. */}
       <View style={styles.section}>
-        <View style={styles.toolbar}>
-          <Dropdown
-            value={filter}
-            options={FILTER_OPTIONS}
-            onChange={setFilter}
-            accessibilityLabel="Show"
-          />
-        </View>
-
         <DayPager
           today={today}
           selectedDate={selectedDate}
@@ -154,10 +136,5 @@ const styles = StyleSheet.create({
   },
   viewButtonPressed: {
     backgroundColor: colors.border,
-  },
-  toolbar: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
   },
 });

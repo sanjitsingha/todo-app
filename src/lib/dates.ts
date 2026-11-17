@@ -102,6 +102,12 @@ export function isDateKey(value: unknown): value is DateKey {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+/** "12 Nov" */
+export function formatDayMonth(key: DateKey): string {
+  const date = fromDateKey(key);
+  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
 /** "Wed, 12 Nov" (year added if not this year), never "Today" / "Tomorrow". */
 export function formatShortDate(key: DateKey, now = new Date()): string {
   return absoluteDayLabel(key, now);
@@ -190,6 +196,11 @@ export function isTimeKey(value: unknown): value is TimeKey {
 export function formatTime(key: TimeKey): string {
   const { hours, minutes } = parseTimeKey(key);
   return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours < 12 ? 'am' : 'pm'}`;
+}
+
+/** An hour of the day (0–23) on its own: "12 am", "6 am", "12 pm". */
+export function formatHour(hours: number): string {
+  return `${hours % 12 || 12} ${hours < 12 ? 'am' : 'pm'}`;
 }
 
 /** "Today, 4:12 pm", or just "Today" when there's no time. */

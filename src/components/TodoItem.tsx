@@ -2,21 +2,23 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { DueDateChip, dueLabel, PriorityChip, priorityOf } from '@/components/TodoChips';
+import { DueDateChip, dueLabel, priorityOf } from '@/components/TodoChips';
 import { colors } from '@/constants/theme';
 import { useTodos, type Todo } from '@/store/todos';
 
 /**
- * One todo in the list: rounded-square checkbox, title, due date (and time), and priority chip.
- * Tapping the row opens the todo's details sheet (src/app/todo/[id].tsx), which also shows the
- * description.
+ * One todo in the list: rounded-square checkbox, title, and due date (and time) below it. Like
+ * a block on the timeline, the card is tinted by priority, with the title in a deep shade of the
+ * same color; done todos are gray. Tapping the row opens the todo's details sheet
+ * (src/app/todo/[id].tsx), which also shows the description.
  */
 export function TodoItem({ todo }: { todo: Todo }) {
   const router = useRouter();
   const { toggleTodo } = useTodos();
+  const priority = priorityOf(todo);
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, !todo.completed && { backgroundColor: priority.background }]}>
       {/* The whole row opens the details. It sits underneath, so the checkbox on top keeps its
           own tap, and the press feedback covers the full row. */}
       <Pressable
@@ -28,7 +30,7 @@ export function TodoItem({ todo }: { todo: Todo }) {
         ]}
         android_ripple={{ color: colors.ripple }}
         accessibilityRole="button"
-        accessibilityLabel={`${todo.title}, ${dueLabel(todo)}, ${priorityOf(todo).label} priority${
+        accessibilityLabel={`${todo.title}, ${dueLabel(todo)}, ${priority.label} priority${
           todo.completed ? ', done' : ''
         }`}
         accessibilityHint="Opens the todo's details"
@@ -49,14 +51,16 @@ export function TodoItem({ todo }: { todo: Todo }) {
       {/* Taps go through to the row underneath. Screen readers get all of this from the row's
           label instead. */}
       <View style={styles.content} aria-hidden>
-        <Text style={[styles.title, todo.completed && styles.titleCompleted]} numberOfLines={2}>
+        <Text
+          style={[styles.title, todo.completed ? styles.titleCompleted : { color: priority.deep }]}
+          numberOfLines={2}
+        >
           {todo.title}
         </Text>
 
-        {/* Due date, then the priority chip. Wraps to a second line if it runs out of room. */}
+        {/* The card's color shows the priority, so just the due date here. */}
         <View style={styles.meta}>
           <DueDateChip todo={todo} />
-          <PriorityChip todo={todo} />
         </View>
       </View>
     </View>
@@ -76,8 +80,8 @@ const CHECKBOX_MARGIN = (TITLE_LINE_HEIGHT - CHECKBOX_SIZE) / 2;
 const CARD_RADIUS = CHECKBOX_RADIUS + CARD_PADDING + CHECKBOX_MARGIN;
 
 const styles = StyleSheet.create({
-  // A very light gray card (the same gray as behind the date strip), lined up with the 16px
-  // edges of the rest of the screen.
+  // Lined up with the 16px edges of the rest of the screen. Tinted by priority while open (see
+  // TodoItem); done, a very light gray (the same gray as behind the date strip).
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -91,8 +95,9 @@ const styles = StyleSheet.create({
     // Keeps the Android ripple inside the rounded corners.
     overflow: 'hidden',
   },
+  // A see-through shade over the card, so it darkens whatever color the card is.
   rowPressed: {
-    backgroundColor: colors.inputBackground,
+    backgroundColor: colors.ripple,
   },
   checkbox: {
     width: CHECKBOX_SIZE,
@@ -101,7 +106,7 @@ const styles = StyleSheet.create({
     borderRadius: CHECKBOX_RADIUS,
     borderWidth: 1.5,
     borderColor: colors.iconInactive,
-    // White, so the empty box stands out on the gray card. Checked, it turns yellow.
+    // White, so the empty box stands out on the tinted card. Checked, it turns yellow.
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',

@@ -51,28 +51,6 @@ export function DueDateChip({ todo, size = 'small' }: ChipProps) {
   );
 }
 
-/**
- * The todo's priority as a tinted pill. Finished todos keep the pill, but in gray: a shade
- * darker than the todo cards, so it still shows on them.
- */
-export function PriorityChip({ todo, size = 'small' }: ChipProps) {
-  const priority = priorityOf(todo);
-  const color = todo.completed ? colors.textSubtle : priority.color;
-  const background = todo.completed ? colors.inkSoft : priority.background;
-  const sizes = SIZES[size];
-
-  return (
-    <View
-      style={[styles.item, sizes.chip, { backgroundColor: background }]}
-      accessible
-      accessibilityLabel={`${priority.label} priority`}
-    >
-      <Ionicons name="flag-outline" size={sizes.icon} color={color} />
-      <Text style={[sizes.text, { color }]}>{priority.label}</Text>
-    </View>
-  );
-}
-
 /** The todo's reminder time as plain gray text, or nothing if it has no reminder. */
 export function ReminderChip({ todo, size = 'small' }: ChipProps) {
   if (!todo.reminderTime) return null;

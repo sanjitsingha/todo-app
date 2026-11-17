@@ -3,34 +3,11 @@ import { StyleSheet } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 
 import { CompletedSection } from '@/components/CompletedSection';
-import { ScreenPlaceholder, type IconName } from '@/components/ScreenPlaceholder';
+import { ScreenPlaceholder } from '@/components/ScreenPlaceholder';
 import { TodoItem } from '@/components/TodoItem';
 import { TodoTimeline } from '@/components/TodoTimeline';
 import { formatDayPhrase, type DateKey } from '@/lib/dates';
 import { useTodos, type Todo } from '@/store/todos';
-
-export type StatusFilter = 'all' | 'pending' | 'completed';
-
-const EMPTY_STATES: Record<
-  StatusFilter,
-  { icon: IconName; title: string; message: (day: string) => string }
-> = {
-  all: {
-    icon: 'list-outline',
-    title: 'No todos',
-    message: (day) => `Nothing due ${day}. Tap + to add one.`,
-  },
-  pending: {
-    icon: 'time-outline',
-    title: 'Nothing pending',
-    message: (day) => `No open todos ${day}.`,
-  },
-  completed: {
-    icon: 'checkmark-done-outline',
-    title: 'Nothing completed',
-    message: (day) => `No finished todos ${day}.`,
-  },
-};
 
 // Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
 const UNTIMED = '~';
@@ -64,7 +41,6 @@ type Props = {
   date: DateKey;
   /** The real current date, for "today" / "tomorrow" in the empty state. */
   today: Date;
-  filter: StatusFilter;
   showTimeline: boolean;
 };
 
@@ -72,42 +48,34 @@ type Props = {
  * One day's todos, as a list of cards or as a timeline: a page of the day pager
  * (src/components/DayPager.tsx).
  */
-export const DayTodos = memo(function DayTodos({ date, today, filter, showTimeline }: Props) {
+export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Props) {
   const { pendingTodos, completedTodos } = useDayTodos(date);
 
-  // "All todos": unfinished ones in the list, finished ones in a Completed section below it.
-  // "Pending" / "Completed": just that one list.
-  const listTodos = filter === 'completed' ? completedTodos : pendingTodos;
-  const showCompletedSection = filter === 'all' && completedTodos.length > 0;
-  const isEmpty = listTodos.length === 0 && !showCompletedSection;
+  // The cards: unfinished todos in the list, finished ones in a Completed section below it.
+  const showCompletedSection = completedTodos.length > 0;
+  const isEmpty = pendingTodos.length === 0 && !showCompletedSection;
 
-  // The timeline shows every todo the filter lets through, finished ones included.
+  // The timeline shows every todo, finished ones included.
   const timelineTodos = useMemo(
-    () =>
-      filter === 'all'
-        ? [...pendingTodos, ...completedTodos]
-        : filter === 'pending'
-          ? pendingTodos
-          : completedTodos,
-    [filter, pendingTodos, completedTodos],
+    () => [...pendingTodos, ...completedTodos],
+    [pendingTodos, completedTodos],
   );
 
   if (showTimeline) return <TodoTimeline todos={timelineTodos} date={date} />;
 
   if (isEmpty) {
-    const emptyState = EMPTY_STATES[filter];
     return (
       <ScreenPlaceholder
-        icon={emptyState.icon}
-        title={emptyState.title}
-        subtitle={emptyState.message(formatDayPhrase(date, today))}
+        icon="list-outline"
+        title="No todos"
+        subtitle={`Nothing due ${formatDayPhrase(date, today)}. Tap + to add one.`}
       />
     );
   }
 
   return (
     <FlatList
-      data={listTodos}
+      data={pendingTodos}
       keyExtractor={keyExtractor}
       renderItem={renderTodo}
       ListFooterComponent={
@@ -119,9 +87,9 @@ export const DayTodos = memo(function DayTodos({ date, today, filter, showTimeli
 });
 
 const styles = StyleSheet.create({
-  // A little room between the filter and the first todo card.
+  // A little room between the date strip and the first todo card.
   list: {
-    paddingTop: 8,
+    paddingTop: 12,
     paddingBottom: 16,
   },
 });
