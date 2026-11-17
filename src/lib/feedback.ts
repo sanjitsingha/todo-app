@@ -18,7 +18,8 @@ let nextPlayer = 0;
  * outlives Fast Refresh, so old copies of this file would keep running in development.
  */
 function syncPlayers() {
-  const usesSound = getSettings().feedback !== 'vibrate';
+  const { feedback } = getSettings();
+  const usesSound = feedback === 'tick' || feedback === 'tickVibrate';
   if (usesSound && players.length === 0) {
     // Mix with other apps, so a tick never pauses the user's music, and stay quiet when the
     // phone is on silent or vibrate (the vibration still plays).
@@ -80,7 +81,7 @@ function firmVibration() {
 
 /**
  * One step of a swipeable strip (days, hours, minutes), as picked under "Haptic Feedback" in
- * Profile: a firm vibration, a tick sound, or a tick sound with a light vibration.
+ * Profile: a firm vibration, a tick sound, a tick sound with a light vibration, or nothing.
  */
 export function tick() {
   syncPlayers();
@@ -94,6 +95,8 @@ export function tick() {
     case 'tickVibrate':
       playTickSound();
       lightVibration();
+      break;
+    case 'none':
       break;
   }
 }

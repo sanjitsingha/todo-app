@@ -4,10 +4,12 @@ import type { BottomTabBarProps } from 'expo-router/tabs';
 import ChartPie from 'lucide-react-native/icons/chart-pie';
 import CirclePlus from 'lucide-react-native/icons/circle-plus';
 import LayoutList from 'lucide-react-native/icons/layout-list';
+import StickyNote from 'lucide-react-native/icons/sticky-note';
 import UserRound from 'lucide-react-native/icons/user-round';
 import type { ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FEATURES } from '@/constants/features';
 import { colors } from '@/constants/theme';
 
 const TAB_ICON_SIZE = 22;
@@ -32,6 +34,10 @@ const TABS = {
     label: 'Stats',
     renderIcon: (color) => <ChartPie size={TAB_ICON_SIZE} color={color} />,
   },
+  sticky: {
+    label: 'Sticky',
+    renderIcon: (color) => <StickyNote size={TAB_ICON_SIZE} color={color} />,
+  },
   profile: {
     label: 'Profile',
     renderIcon: (color) => <UserRound size={TAB_ICON_SIZE} color={color} />,
@@ -42,9 +48,9 @@ type TabName = keyof typeof TABS;
 
 /**
  * Bottom navbar, evenly spaced, each an icon with its name under it: Today (the Todo screen),
- * Add Todo, Stats, and Profile. The open tab is dark, the rest gray. Add Todo is not a tab: a
- * plain button like the tabs around it, in their gray, that opens the Add todo sheet above the
- * current tab.
+ * Add Todo, Stats, Sticky (the sticky note wall, while it's hidden: see FEATURES), and Profile.
+ * The open tab is dark, the rest gray. Add Todo is not a tab: a plain button like the tabs
+ * around it, in their gray, that opens the Add todo sheet above the current tab.
  */
 export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const router = useRouter();
@@ -104,6 +110,7 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
         </Pressable>
 
         {renderTab('stats')}
+        {FEATURES.sticky ? renderTab('sticky') : null}
         {renderTab('profile')}
       </View>
     </View>

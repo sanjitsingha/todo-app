@@ -1,56 +1,103 @@
-import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+// Just these icons, not the whole icon set.
+import Bot from 'lucide-react-native/icons/bot';
+import CalendarSync from 'lucide-react-native/icons/calendar-sync';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import LogIn from 'lucide-react-native/icons/log-in';
+import LogOut from 'lucide-react-native/icons/log-out';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import SunMoon from 'lucide-react-native/icons/sun-moon';
+import Vibrate from 'lucide-react-native/icons/vibrate';
+import type { ComponentType, ReactNode } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 
-import { Dropdown, type DropdownOption } from '@/components/Dropdown';
 import { colors } from '@/constants/theme';
-import { tick } from '@/lib/feedback';
-import { updateSettings, useSettings, type FeedbackMode } from '@/store/settings';
+import { logOut, useAuth } from '@/store/auth';
 
-const FEEDBACK_OPTIONS: readonly DropdownOption<FeedbackMode>[] = [
-  { value: 'vibrate', label: 'Vibrate' },
-  { value: 'tick', label: 'Tick' },
-  { value: 'tickVibrate', label: 'Tick with Vibration' },
-];
+const ICON_SIZE = 22;
 
-/** The Profile tab: signing in, and the app's settings (for now, haptic feedback). */
+type LucideIcon = ComponentType<{ size?: number; color?: string }>;
+
+type RowProps = {
+  icon: LucideIcon;
+  title: string;
+  /** Red, for leaving: Log out. */
+  destructive?: boolean;
+  /** What sits at the right end: a chevron unless given. */
+  accessory?: ReactNode;
+  onPress?: () => void;
+};
+
+/** A row of the list: Lucide icon, title, and a chevron (or `accessory`) at the right. */
+function Row({ icon: Icon, title, destructive = false, accessory, onPress }: RowProps) {
+  const tint = destructive ? colors.danger : colors.ink;
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        // Android shows a ripple instead.
+        pressed && Platform.OS !== 'android' && styles.rowPressed,
+      ]}
+      android_ripple={{ color: colors.ripple }}
+      accessibilityRole="button"
+      accessibilityLabel={title}
+    >
+      <Icon size={ICON_SIZE} color={tint} />
+      <Text style={[styles.rowTitle, destructive && { color: colors.danger }]}>{title}</Text>
+      {accessory === undefined ? (
+        <ChevronRight size={18} color={colors.iconInactive} />
+      ) : (
+        accessory
+      )}
+    </Pressable>
+  );
+}
+
+/**
+ * The Profile tab: the app's settings and accounts, top to bottom: Haptic Feedback, Appearance,
+ * Check for Updates, Connect Google Calendar, Connect ChatGPT, Privacy Policy, then Log Out when
+ * signed in, or Log In (which opens the login screen) when not. The settings open bottom sheets:
+ * so far Haptic Feedback and Appearance (src/app/haptic-feedback.tsx, src/app/appearance.tsx);
+ * the rest are in place for what comes next.
+ */
+/** Asks first. Signing out keeps the todos on the phone; they're in the account too. */
+function confirmLogOut() {
+  Alert.alert('Log out?', 'Your todos stay on this phone, and they’re saved in your account.', [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Log Out',
+      style: 'destructive',
+      onPress: async () => {
+        const problem = await logOut();
+        if (problem) Alert.alert('Couldn’t log out', problem);
+      },
+    },
+  ]);
+}
+
 export default function ProfileScreen() {
   const router = useRouter();
-  const { feedback } = useSettings();
-
-  const setFeedback = (next: FeedbackMode) => {
-    updateSettings({ feedback: next });
-    // Let the user feel / hear what they just picked.
-    tick();
-  };
+  const { user } = useAuth();
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
-      <Pressable
-        onPress={() => router.push('/login')}
-        style={styles.row}
-        android_ripple={{ color: colors.ripple }}
-        accessibilityRole="button"
-      >
-        <Ionicons name="person-circle-outline" size={22} color={colors.ink} />
-        <Text style={styles.rowTitle}>Sign in</Text>
-        <Ionicons name="chevron-forward" size={18} color={colors.iconInactive} />
-      </Pressable>
-
-      <View style={styles.row}>
-        <Ionicons name="volume-medium-outline" size={22} color={colors.ink} />
-        <Text style={styles.rowTitle}>Haptic Feedback</Text>
-        {/* Wrapped so the row centers it on the title (the button itself sticks to the top). */}
-        <View>
-          <Dropdown
-            value={feedback}
-            options={FEEDBACK_OPTIONS}
-            onChange={setFeedback}
-            accessibilityLabel="Haptic Feedback"
-            align="right"
-          />
-        </View>
-      </View>
+      <Row
+        icon={Vibrate}
+        title="Haptic Feedback"
+        onPress={() => router.push('/haptic-feedback')}
+      />
+      <Row icon={SunMoon} title="Appearance" onPress={() => router.push('/appearance')} />
+      <Row icon={RefreshCw} title="Check for Updates" />
+      <Row icon={CalendarSync} title="Connect Google Calendar" />
+      <Row icon={Bot} title="Connect ChatGPT" />
+      <Row icon={ShieldCheck} title="Privacy Policy" />
+      {user ? (
+        <Row icon={LogOut} title="Log Out" destructive accessory={null} onPress={confirmLogOut} />
+      ) : (
+        <Row icon={LogIn} title="Log In" onPress={() => router.push('/login')} />
+      )}
     </ScrollView>
   );
 }
@@ -66,10 +113,12 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 16,
   },
+  rowPressed: {
+    backgroundColor: colors.inputBackground,
+  },
   rowTitle: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '600',
     color: colors.text,
   },
 });

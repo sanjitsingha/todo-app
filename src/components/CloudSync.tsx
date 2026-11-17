@@ -1,0 +1,80 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+
+import { syncSettings } from '@/lib/settingsSync';
+import { syncTodos } from '@/lib/todoSync';
+import { useAuth } from '@/store/auth';
+import { getSettingsSync, useSettings } from '@/store/settings';
+import { useTodos } from '@/store/todos';
+
+/** After a change on the phone, wait this long, so a quick run of changes goes up together. */
+const CHANGE_DELAY_MS = 1500;
+
+// One sync at a time. Asking while one runs runs one more after it, for the latest account.
+let running = false;
+let wanted: string | null = null;
+
+async function runSyncs() {
+  if (running) return;
+  running = true;
+  try {
+    while (wanted) {
+      const userId = wanted;
+      wanted = null;
+      try {
+        await syncTodos(userId);
+        await syncSettings(userId);
+      } catch (error) {
+        // Offline, most likely. Nothing is lost: it's all on the phone, marked to send.
+        console.warn('Could not sync with your account; will try again later.', error);
+        break;
+      }
+    }
+  } finally {
+    running = false;
+  }
+}
+
+function requestSync(userId: string) {
+  wanted = userId;
+  void runSyncs();
+}
+
+/**
+ * Keeps the phone and the signed-in account in step (todos: src/lib/todoSync.ts, settings:
+ * src/lib/settingsSync.ts). It syncs on signing in (or opening the app signed in), on coming
+ * back to the app, and shortly after anything changes on the phone. Signed out, it does
+ * nothing, and the app works on the phone alone. Draws nothing.
+ */
+export function CloudSync() {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const { todos } = useTodos();
+  const settings = useSettings();
+
+  useEffect(() => {
+    if (userId) requestSync(userId);
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') requestSync(userId);
+    });
+    return () => subscription.remove();
+  }, [userId]);
+
+  // Anything not sent yet: todos changed here, todos not the account's yet, or settings.
+  const waiting =
+    userId !== null &&
+    (todos.some((todo) => todo.unsynced || todo.userId !== userId) || getSettingsSync().unsynced);
+
+  // Restarts the wait on every change (`todos`, `settings`), so it fires once things settle.
+  useEffect(() => {
+    if (!userId || !waiting) return;
+    const timer = setTimeout(() => requestSync(userId), CHANGE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [userId, waiting, todos, settings]);
+
+  return null;
+}

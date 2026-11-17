@@ -188,7 +188,6 @@ const styles = StyleSheet.create({
   },
   triggerText: {
     fontSize: 15,
-    fontWeight: '600',
     color: colors.text,
   },
   menu: {
@@ -219,7 +218,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   itemTextSelected: {
-    fontWeight: '600',
     color: colors.ink,
   },
 });

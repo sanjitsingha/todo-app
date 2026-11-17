@@ -19,6 +19,8 @@ export const colors = {
   danger: '#DC2626',
   /** Green for "all done", like the full goal ring. */
   success: '#16A34A',
+  /** A deeper green, for text: the On time count on the Stats tab. */
+  successDark: '#15803D',
   /** Tinted backgrounds and their text colors, used for the priority options and date chips. */
   dangerSoft: '#FEE2E2',
   amberSoft: '#FEF3C7',
@@ -43,4 +45,15 @@ export const colors = {
    */
   sun: '#EAB308',
   sky: '#0EA5E9',
+  /** Sticky note colors on the Sticky tab (src/constants/sticky.ts). Pale, under dark text. */
+  stickyYellow: '#FDE68A',
+  stickyPink: '#FBCFE8',
+  stickyBlue: '#BFDBFE',
+  stickyGreen: '#BBF7D0',
+  stickyPurple: '#DDD6FE',
+  stickyOrange: '#FED7AA',
+  /** The dots on the Sticky tab's wall. */
+  wallDot: '#CBD5E1',
+  /** Behind a sticky being written, so the wall fades back. */
+  wallVeil: 'rgba(248, 250, 252, 0.88)',
 } as const;

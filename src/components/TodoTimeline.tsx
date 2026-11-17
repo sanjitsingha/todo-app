@@ -292,7 +292,11 @@ export function TodoTimeline({ todos, date }: Props) {
       {allDay.length > 0 ? (
         <View style={styles.allDay}>
           <Text style={styles.allDayLabel}>All day</Text>
-          <ScrollView style={styles.allDayList} contentContainerStyle={styles.allDayContent}>
+          <ScrollView
+            style={styles.allDayList}
+            contentContainerStyle={styles.allDayContent}
+            showsVerticalScrollIndicator={false}
+          >
             {allDay.map((todo) => (
               <TimelineChip key={todo.id} todo={todo} onPress={() => openTodo(todo)} />
             ))}
@@ -309,6 +313,7 @@ export function TodoTimeline({ todos, date }: Props) {
           yieldsToContinuousGestures
           onLayout={() => setLaidOut(true)}
           scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.gridContent}
         >
           <Animated.View style={gridHeight}>

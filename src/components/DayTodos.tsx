@@ -82,6 +82,7 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
         showCompletedSection ? <CompletedSection todos={completedTodos} /> : undefined
       }
       contentContainerStyle={styles.list}
+      showsVerticalScrollIndicator={false}
     />
   );
 });

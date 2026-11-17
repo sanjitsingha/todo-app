@@ -1,8 +1,9 @@
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useIsFocused, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import type { TextInputInstance } from 'react-native';
 
 import {
+  ErrorMessage,
   FooterPrompt,
   GoogleButton,
   OrDivider,
@@ -11,21 +12,44 @@ import {
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
+import { FEATURES } from '@/constants/features';
 import { isEmail } from '@/lib/validation';
+import { logIn, useAuth } from '@/store/auth';
 
-/** Log in with Google, or with email and password. UI only: the buttons don't sign in yet. */
+/**
+ * Log in with email and password (through Supabase; src/store/auth.tsx), or with Google once
+ * that's set up (FEATURES.googleSignIn). As soon as someone is signed in (here, or by setting a
+ * new password on the screen above it) it closes, back to where it was opened from; the todos
+ * then sync with the account.
+ */
 export default function LoginScreen() {
   const router = useRouter();
   const passwordRef = useRef<TextInputInstance>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only while it's the screen showing, so a sign-in from the password screen above it waits
+  // until that screen has closed.
+  const { user } = useAuth();
+  const focused = useIsFocused();
+  useEffect(() => {
+    if (user && focused) router.back();
+  }, [user, focused, router]);
 
   const canLogIn = isEmail(email) && password.length > 0;
 
-  // UI only: connect these to an auth provider.
+  // Not set up yet: hidden behind FEATURES.googleSignIn.
   const continueWithGoogle = () => {};
-  const logIn = () => {
-    if (!canLogIn) return;
+  const submit = async () => {
+    if (!canLogIn || busy) return;
+    setBusy(true);
+    setError(null);
+    const problem = await logIn(email, password);
+    setBusy(false);
+    // Signed in, the screen closes itself (above).
+    if (problem) setError(problem);
   };
 
   return (
@@ -40,8 +64,12 @@ export default function LoginScreen() {
         />
       }
     >
-      <GoogleButton onPress={continueWithGoogle} />
-      <OrDivider />
+      {FEATURES.googleSignIn ? (
+        <>
+          <GoogleButton onPress={continueWithGoogle} />
+          <OrDivider />
+        </>
+      ) : null}
 
       <AuthField
         label="Email"
@@ -70,10 +98,11 @@ export default function LoginScreen() {
         autoComplete="current-password"
         textContentType="password"
         returnKeyType="go"
-        onSubmitEditing={logIn}
+        onSubmitEditing={submit}
       />
 
-      <PrimaryButton label="Log in" onPress={logIn} disabled={!canLogIn} />
+      <ErrorMessage message={error} />
+      <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
     </AuthScreen>
   );
 }

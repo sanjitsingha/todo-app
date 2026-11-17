@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ChipGroup, type ChipOption } from '@/components/ChipGroup';
+import { OnTimeSummary } from '@/components/OnTimeSummary';
 import { TodosWrittenChart, type ChartRange } from '@/components/TodosWrittenChart';
 import { colors } from '@/constants/theme';
 
@@ -12,9 +13,9 @@ const RANGE_OPTIONS: readonly ChipOption<ChartRange>[] = [
 ];
 
 /**
- * The Stats tab: charts of how your todos are going, each on a white card on the gray page.
- * For now, todos written per hour or day. The Today / Week / Month chips just under the header
- * pick the range; they stay put while the cards scroll.
+ * The Stats tab: charts of how your todos are going, each on a white card on the gray page:
+ * todos written per hour or day, and how many were done on time. The Today / Week / Month
+ * chips just under the header pick the range for both; they stay put while the cards scroll.
  */
 export default function StatsScreen() {
   const [range, setRange] = useState<ChartRange>('week');
@@ -37,6 +38,13 @@ export default function StatsScreen() {
           </Text>
           <TodosWrittenChart range={range} />
         </View>
+
+        <View style={styles.card}>
+          <Text style={styles.title} accessibilityRole="header">
+            On time
+          </Text>
+          <OnTimeSummary range={range} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -52,6 +60,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    gap: 16,
   },
   card: {
     padding: 16,

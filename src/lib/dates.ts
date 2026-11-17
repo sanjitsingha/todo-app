@@ -182,6 +182,33 @@ export function toDayMinutes(key: TimeKey): number {
   return hours * 60 + minutes;
 }
 
+/**
+ * The moment a todo is late from, as a timestamp: the end of its due day, or if it has a due
+ * time, the end of the minute its time slot ends in (the due time plus its duration, as on the
+ * timeline). Done any time before this, even days early, it's on time.
+ */
+export function deadlineOf({
+  dueDate,
+  dueTime,
+  duration,
+}: {
+  dueDate: DateKey;
+  dueTime?: TimeKey;
+  duration?: number;
+}): number {
+  const day = fromDateKey(dueDate);
+  if (!dueTime) return addDays(day, 1).getTime();
+  const { hours, minutes } = parseTimeKey(dueTime);
+  const lastMinute = minutes + (duration ?? 0);
+  return new Date(
+    day.getFullYear(),
+    day.getMonth(),
+    day.getDate(),
+    hours,
+    lastMinute + 1,
+  ).getTime();
+}
+
 /** The other way round: 972 is "16:12". */
 export function fromDayMinutes(total: number): TimeKey {
   return toTimeKey(Math.floor(total / 60), total % 60);

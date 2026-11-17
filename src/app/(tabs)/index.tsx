@@ -10,6 +10,7 @@ import { DateStrip } from '@/components/DateStrip';
 import { DayPager } from '@/components/DayPager';
 import { DayTodos, useDayTodos } from '@/components/DayTodos';
 import { GoalRing } from '@/components/GoalRing';
+import { FEATURES } from '@/constants/features';
 import { colors } from '@/constants/theme';
 import type { DateKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
@@ -88,11 +89,14 @@ export default function TodoScreen() {
     <View style={styles.screen}>
       <DateHeader
         date={selectedDate}
+        // Hidden for now (FEATURES.goalRingInHeader); it's moving somewhere else later.
         accessory={
-          <GoalRing
-            total={pendingTodos.length + completedTodos.length}
-            done={completedTodos.length}
-          />
+          FEATURES.goalRingInHeader ? (
+            <GoalRing
+              total={pendingTodos.length + completedTodos.length}
+              done={completedTodos.length}
+            />
+          ) : undefined
         }
         action={timelineButton}
       />

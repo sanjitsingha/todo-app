@@ -1,23 +1,28 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/constants/theme';
 
-/** The main action of an auth screen. Same look as the "Add todo" button. */
+/**
+ * The main action of an auth screen. Same look as the "Add todo" button. While `loading`, it
+ * shows a spinner instead of its label and can't be pressed again.
+ */
 export function PrimaryButton({
   label,
   onPress,
   disabled = false,
+  loading = false,
 }: {
   label: string;
   onPress: () => void;
   disabled?: boolean;
+  loading?: boolean;
 }) {
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={disabled || loading}
       style={({ pressed }) => [
         styles.button,
         styles.primary,
@@ -25,10 +30,25 @@ export function PrimaryButton({
         pressed && styles.primaryPressed,
       ]}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: disabled || loading, busy: loading }}
     >
-      <Text style={styles.primaryText}>{label}</Text>
+      {loading ? (
+        <ActivityIndicator color={colors.onPrimary} />
+      ) : (
+        <Text style={styles.primaryText}>{label}</Text>
+      )}
     </Pressable>
+  );
+}
+
+/** What went wrong (a wrong password, no internet), in red above the main button. */
+export function ErrorMessage({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+      {message}
+    </Text>
   );
 }
 
@@ -142,5 +162,10 @@ const styles = StyleSheet.create({
   prompt: {
     fontSize: 14,
     color: colors.textMuted,
+  },
+  error: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.danger,
   },
 });
