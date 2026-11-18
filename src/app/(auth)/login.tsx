@@ -3,28 +3,26 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
 
 import {
-  EmailButton,
   ErrorMessage,
   FooterPrompt,
   GOOGLE_NOT_READY,
   GoogleButton,
+  OrDivider,
   PrimaryButton,
   TextLink,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { FEATURES } from '@/constants/features';
-import { useEmailStep } from '@/hooks/useEmailStep';
 import { isEmail } from '@/lib/validation';
 import { logIn, useAuth } from '@/store/auth';
 
 /**
- * Log in. It opens on two choices, Continue with Google and Continue with email. Email swaps
- * in the email and password form (through Supabase; src/store/auth.tsx); the back arrow, or
- * Android's back button, goes back to the choices. Google works once it's set up
- * (FEATURES.googleSignIn); until then it says so. As soon as someone is signed in (here, or by
- * setting a new password on the screen above it) it closes, back to where it was opened from;
- * the todos then sync with the account.
+ * Log in: the email and password form (through Supabase; src/store/auth.tsx), with Continue
+ * with Google under its Log in button, and a "New here? Create an account" line at the bottom
+ * (it opens sign up instead). Google works once it's set up (FEATURES.googleSignIn); until then
+ * it says so. As soon as someone is signed in (here, or by setting a new password on the screen
+ * above it) it closes, back to where it was opened from; the todos then sync with the account.
  */
 export default function LoginScreen() {
   const router = useRouter();
@@ -33,7 +31,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { withEmail, showEmailForm, showChoices } = useEmailStep(setError);
 
   // Only while it's the screen showing, so a sign-in from the password screen above it waits
   // until that screen has closed.
@@ -48,6 +45,9 @@ export default function LoginScreen() {
     if (!FEATURES.googleSignIn) setError(GOOGLE_NOT_READY);
   };
 
+  // Swaps this screen for sign up, so back from there goes to where login was opened from.
+  const goToSignUp = () => router.replace('/register');
+
   const canLogIn = isEmail(email) && password.length > 0;
   const submit = async () => {
     if (!canLogIn || busy) return;
@@ -61,75 +61,56 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      // Top 40% left empty for now; the choices, then the form, take the bottom 60%.
+      // Top 60% left empty for now; the form takes the bottom 40%, and more when it needs it.
       split
       title="Log in to your account"
-      onBack={withEmail ? showChoices : undefined}
       footer={
-        <FooterPrompt
-          prompt="Don’t have an account?"
-          action="Sign up"
-          onPress={() => router.replace('/register')}
-        />
+        <FooterPrompt prompt="New here?" action="Create an account" onPress={goToSignUp} />
       }
     >
-      {withEmail ? (
-        <>
-          <AuthField
-            minimal
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-            submitBehavior="submit"
-            // Chose email: ready to type.
-            autoFocus
-            onSubmitEditing={() => passwordRef.current?.focus()}
-          />
-          <AuthField
-            ref={passwordRef}
-            minimal
-            label="Password"
-            secure
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            autoCapitalize="none"
-            autoComplete="current-password"
-            textContentType="password"
-            returnKeyType="go"
-            onSubmitEditing={submit}
-          />
-          {/* Under the password box, at its right end (there's no label row to sit in). */}
-          <View style={styles.forgot}>
-            <TextLink onPress={() => router.push('/forgot-password')}>Forgot password?</TextLink>
-          </View>
+      <AuthField
+        minimal
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="Email"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <AuthField
+        ref={passwordRef}
+        minimal
+        label="Password"
+        secure
+        value={password}
+        onChangeText={setPassword}
+        placeholder="Password"
+        autoCapitalize="none"
+        autoComplete="current-password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={submit}
+      />
+      {/* Under the password box, at its right end (there's no label row to sit in). */}
+      <View style={styles.forgot}>
+        <TextLink onPress={() => router.push('/forgot-password')}>Forgot password?</TextLink>
+      </View>
 
-          <ErrorMessage message={error} />
-          <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
-        </>
-      ) : (
-        <>
-          <View style={styles.choices}>
-            <GoogleButton onPress={continueWithGoogle} />
-            <EmailButton onPress={showEmailForm} />
-          </View>
-          <ErrorMessage message={error} />
-        </>
-      )}
+      <ErrorMessage message={error} />
+      <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
+
+      <OrDivider />
+      <GoogleButton onPress={continueWithGoogle} />
     </AuthScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  choices: {
-    gap: 12,
-  },
   // A little closer to the box it belongs to than the form's usual gap.
   forgot: {
     alignSelf: 'flex-end',

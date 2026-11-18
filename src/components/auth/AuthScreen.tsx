@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
   ScrollView,
@@ -19,18 +19,18 @@ type Props = {
   /** Pinned to the bottom, e.g. "Don't have an account? Sign up". */
   footer?: ReactNode;
   /**
-   * Splits the screen in two: the top 40% for `top` (and the back arrow), the bottom 60% a
-   * white panel with the title, the form and the footer. Used by the login screen.
+   * Splits the screen in two: the top 60% for `top` (and the back arrow), the bottom 40% a
+   * white panel with the title, the form and the footer. Used by the login and sign-up screens.
+   * When the panel needs more than 40% (their forms do, on most phones), it grows up into the
+   * top part, which keeps at least room for the back arrow; past that, the screen scrolls.
    */
   split?: boolean;
-  /** What goes in the top 40% of a split screen, under the back arrow. */
+  /** What goes in the top part of a split screen, under the back arrow. */
   top?: ReactNode;
-  /** What the back arrow does instead of going back, e.g. a step back within the screen. */
-  onBack?: () => void;
 };
 
-/** How much of the screen's height the top part of a split screen takes. */
-const SPLIT_TOP = 0.4;
+/** How much of the screen's height the top part of a split screen takes, at most. */
+const SPLIT_TOP = 0.6;
 
 /**
  * The frame shared by the login, register and forgot-password screens: a back arrow, a title
@@ -45,12 +45,14 @@ export function AuthScreen({
   footer,
   split = false,
   top,
-  onBack,
 }: Props) {
   const insets = useSafeAreaInsets();
-  // The window keeps its height while the keyboard is up (edge-to-edge), so the top part stays
-  // the same size and the form scrolls up under it instead of squashing it.
-  const { height } = useWindowDimensions();
+  // The height the split screen has to show itself in: the window's, until it's laid out. It
+  // loses the keyboard's height while that's up (the padding below), so the top part gives up
+  // its room first and the form stays above the keyboard.
+  const { height: windowHeight } = useWindowDimensions();
+  const [visibleHeight, setVisibleHeight] = useState(0);
+  const height = visibleHeight || windowHeight;
 
   const form = (
     <>
@@ -72,15 +74,27 @@ export function AuthScreen({
           contentContainerStyle={styles.splitContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          onLayout={(event) => setVisibleHeight(event.nativeEvent.layout.height)}
         >
-          <View style={[styles.top, { height: height * SPLIT_TOP, paddingTop: insets.top + 8 }]}>
+          {/* Fills what the panel leaves, up to 60%. */}
+          <View
+            style={[styles.top, { maxHeight: height * SPLIT_TOP, paddingTop: insets.top + 8 }]}
+          >
             <View style={styles.back}>
-              <BackButton onPress={onBack} />
+              <BackButton />
             </View>
             {top}
           </View>
 
-          <View style={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>{form}</View>
+          {/* At least the other 40%, and as tall as its content when that's more. */}
+          <View
+            style={[
+              styles.panel,
+              { minHeight: height * (1 - SPLIT_TOP), paddingBottom: insets.bottom + 24 },
+            ]}
+          >
+            {form}
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     );
@@ -98,7 +112,7 @@ export function AuthScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.back}>
-          <BackButton onPress={onBack} />
+          <BackButton />
         </View>
 
         {form}
@@ -124,12 +138,13 @@ const styles = StyleSheet.create({
   splitContent: {
     flexGrow: 1,
   },
+  // Grows into whatever the panel doesn't take, up to its 60% (maxHeight, set above).
   top: {
+    flexGrow: 1,
     paddingHorizontal: 24,
   },
-  // The bottom 60%: grows to the bottom of the screen, so the footer can sit there.
+  // The bottom 40% or more (minHeight, set above). The footer sits at its bottom.
   panel: {
-    flexGrow: 1,
     paddingTop: 32,
     paddingHorizontal: 24,
     borderTopLeftRadius: 24,

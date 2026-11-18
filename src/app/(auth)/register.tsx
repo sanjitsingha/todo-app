@@ -1,26 +1,24 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, View, type TextInputInstance } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 
 import {
-  EmailButton,
   ErrorMessage,
   FooterPrompt,
   GOOGLE_NOT_READY,
   GoogleButton,
+  OrDivider,
   PrimaryButton,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { FEATURES } from '@/constants/features';
-import { useEmailStep } from '@/hooks/useEmailStep';
 import { isEmail, MIN_PASSWORD_LENGTH } from '@/lib/validation';
 import { signUp } from '@/store/auth';
 
 /**
- * Sign up, laid out like the login screen. It opens on two choices, Continue with Google and
- * Continue with email. Email swaps in the name, email and password form (through Supabase;
- * src/store/auth.tsx); the back arrow, or Android's back button, goes back to the choices.
+ * Sign up, laid out like the login screen: the name, email and password form (through
+ * Supabase; src/store/auth.tsx), with Continue with Google under its Create account button.
  * Google works once it's set up (FEATURES.googleSignIn); until then it says so. Signed up, it
  * goes back to where it was opened from, signed in. If the project asks new accounts to
  * confirm their email first, it says to check the inbox instead.
@@ -35,7 +33,6 @@ export default function RegisterScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const { withEmail, showEmailForm, showChoices } = useEmailStep(setError);
 
   // Not set up yet: says so instead of doing nothing (FEATURES.googleSignIn).
   const continueWithGoogle = () => {
@@ -69,11 +66,10 @@ export default function RegisterScreen() {
 
   return (
     <AuthScreen
-      // Top 40% left empty for now, like the login screen; the choices, then the form, take the
-      // bottom 60%.
+      // Top 60% left empty for now, like the login screen; the form takes the bottom 40%, and
+      // more when it needs it.
       split
       title="Create your account"
-      onBack={withEmail ? showChoices : undefined}
       footer={
         <FooterPrompt
           prompt="Already have an account?"
@@ -82,77 +78,60 @@ export default function RegisterScreen() {
         />
       }
     >
-      {withEmail ? (
-        <>
-          <AuthField
-            minimal
-            label="Name"
-            value={name}
-            onChangeText={setName}
-            placeholder="Name"
-            autoCapitalize="words"
-            autoComplete="name"
-            textContentType="name"
-            returnKeyType="next"
-            submitBehavior="submit"
-            // Chose email: ready to type.
-            autoFocus
-            onSubmitEditing={() => emailRef.current?.focus()}
-          />
-          <AuthField
-            ref={emailRef}
-            minimal
-            label="Email"
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            returnKeyType="next"
-            submitBehavior="submit"
-            onSubmitEditing={() => passwordRef.current?.focus()}
-          />
-          <AuthField
-            ref={passwordRef}
-            minimal
-            label="Password"
-            hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
-            secure
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            autoCapitalize="none"
-            autoComplete="new-password"
-            textContentType="newPassword"
-            returnKeyType="go"
-            onSubmitEditing={register}
-          />
+      <AuthField
+        minimal
+        label="Name"
+        value={name}
+        onChangeText={setName}
+        placeholder="Name"
+        autoCapitalize="words"
+        autoComplete="name"
+        textContentType="name"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <AuthField
+        ref={emailRef}
+        minimal
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
+        placeholder="Email"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
+      />
+      <AuthField
+        ref={passwordRef}
+        minimal
+        label="Password"
+        hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
+        secure
+        value={password}
+        onChangeText={setPassword}
+        placeholder="Password"
+        autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
+        returnKeyType="go"
+        onSubmitEditing={register}
+      />
 
-          <ErrorMessage message={error} />
-          <PrimaryButton
-            label="Create account"
-            onPress={register}
-            disabled={!canRegister}
-            loading={busy}
-          />
-        </>
-      ) : (
-        <>
-          <View style={styles.choices}>
-            <GoogleButton onPress={continueWithGoogle} />
-            <EmailButton onPress={showEmailForm} />
-          </View>
-          <ErrorMessage message={error} />
-        </>
-      )}
+      <ErrorMessage message={error} />
+      <PrimaryButton
+        label="Create account"
+        onPress={register}
+        disabled={!canRegister}
+        loading={busy}
+      />
+
+      <OrDivider />
+      <GoogleButton onPress={continueWithGoogle} />
     </AuthScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  choices: {
-    gap: 12,
-  },
-});

@@ -6,16 +6,13 @@ import { colors } from '@/constants/theme';
 
 /**
  * Back arrow for a screen header. Goes back like the system back button, or to the Todo
- * screen when there's nothing to go back to. `onPress` replaces that, for a step back within
- * a screen (the login screen's email form back to its first view).
+ * screen when there's nothing to go back to.
  */
-export function BackButton({ onPress }: { onPress?: () => void } = {}) {
+export function BackButton() {
   const router = useRouter();
 
   const goBack = () => {
-    if (onPress) {
-      onPress();
-    } else if (router.canGoBack()) {
+    if (router.canGoBack()) {
       router.back();
     } else {
       router.navigate('/');
