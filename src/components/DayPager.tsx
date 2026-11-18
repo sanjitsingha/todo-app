@@ -115,7 +115,6 @@ export function DayPager({ today, selectedDate, onSelectDate, renderDay, swipePo
       scrollTo(listRef, x, 0, false);
       if (swiping.get()) swipePosition.set(x / pageWidth);
     },
-    [pageWidth],
   );
 
   // The pager came to rest on day `index`: pick it.

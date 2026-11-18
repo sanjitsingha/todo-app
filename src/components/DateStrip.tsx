@@ -82,7 +82,6 @@ export const DateStrip = memo(function DateStrip({
     (day) => {
       if (day !== null) scrollTo(listRef, day * step, 0, false);
     },
-    [step],
   );
 
   const renderItem = useCallback(
