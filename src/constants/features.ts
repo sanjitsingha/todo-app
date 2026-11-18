@@ -14,8 +14,9 @@ export const FEATURES = {
    */
   goalRingInHeader: false,
   /**
-   * "Continue with Google" on the login and sign-up screens. Off until Google sign-in is set up
-   * (it needs a development build and Google Cloud keys); email and password work meanwhile.
+   * Google sign-in. Off until it's set up (it needs a development build and Google Cloud keys);
+   * email and password work meanwhile. Off, "Continue with Google" on the login and sign-up
+   * screens says it isn't ready yet.
    */
   googleSignIn: false,
 };

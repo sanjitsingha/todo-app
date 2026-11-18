@@ -21,11 +21,17 @@ type Props = Omit<TextInputProps, 'style' | 'secureTextEntry' | 'ref'> & {
   secure?: boolean;
   /** A line of help under the field, e.g. "At least 8 characters". */
   hint?: string;
+  /**
+   * Just the soft gray box, the same while you type in it: no label above it (`label` is still
+   * what screen readers say, and `labelAction` isn't shown), so the placeholder says what goes
+   * in it, and no outline. Used by the login screen's email form.
+   */
+  minimal?: boolean;
 };
 
 /**
  * A labeled text field for the auth screens: a soft gray box that turns white with a dark
- * outline while you type in it.
+ * outline while you type in it (or stays gray with no label or outline, when `minimal`).
  */
 export function AuthField({
   ref,
@@ -33,6 +39,7 @@ export function AuthField({
   labelAction,
   secure = false,
   hint,
+  minimal = false,
   onFocus,
   onBlur,
   ...inputProps
@@ -42,12 +49,16 @@ export function AuthField({
 
   return (
     <View>
-      <View style={styles.labelRow}>
-        <Text style={styles.label}>{label}</Text>
-        {labelAction}
-      </View>
+      {minimal ? null : (
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>{label}</Text>
+          {labelAction}
+        </View>
+      )}
 
-      <View style={[styles.box, focused && styles.boxFocused]}>
+      <View
+        style={[styles.box, minimal ? styles.boxMinimal : focused && styles.boxFocused]}
+      >
         <TextInput
           ref={ref}
           style={styles.input}
@@ -114,6 +125,9 @@ const styles = StyleSheet.create({
   boxFocused: {
     borderColor: colors.ink,
     backgroundColor: colors.surface,
+  },
+  boxMinimal: {
+    borderWidth: 0,
   },
   input: {
     flex: 1,

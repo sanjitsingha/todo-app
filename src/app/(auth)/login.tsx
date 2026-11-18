@@ -1,26 +1,30 @@
 import { useIsFocused, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import type { TextInputInstance } from 'react-native';
+import { StyleSheet, View, type TextInputInstance } from 'react-native';
 
 import {
+  EmailButton,
   ErrorMessage,
   FooterPrompt,
+  GOOGLE_NOT_READY,
   GoogleButton,
-  OrDivider,
   PrimaryButton,
   TextLink,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { FEATURES } from '@/constants/features';
+import { useEmailStep } from '@/hooks/useEmailStep';
 import { isEmail } from '@/lib/validation';
 import { logIn, useAuth } from '@/store/auth';
 
 /**
- * Log in with email and password (through Supabase; src/store/auth.tsx), or with Google once
- * that's set up (FEATURES.googleSignIn). As soon as someone is signed in (here, or by setting a
- * new password on the screen above it) it closes, back to where it was opened from; the todos
- * then sync with the account.
+ * Log in. It opens on two choices, Continue with Google and Continue with email. Email swaps
+ * in the email and password form (through Supabase; src/store/auth.tsx); the back arrow, or
+ * Android's back button, goes back to the choices. Google works once it's set up
+ * (FEATURES.googleSignIn); until then it says so. As soon as someone is signed in (here, or by
+ * setting a new password on the screen above it) it closes, back to where it was opened from;
+ * the todos then sync with the account.
  */
 export default function LoginScreen() {
   const router = useRouter();
@@ -29,6 +33,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { withEmail, showEmailForm, showChoices } = useEmailStep(setError);
 
   // Only while it's the screen showing, so a sign-in from the password screen above it waits
   // until that screen has closed.
@@ -38,10 +43,12 @@ export default function LoginScreen() {
     if (user && focused) router.back();
   }, [user, focused, router]);
 
-  const canLogIn = isEmail(email) && password.length > 0;
+  // Not set up yet: says so instead of doing nothing (FEATURES.googleSignIn).
+  const continueWithGoogle = () => {
+    if (!FEATURES.googleSignIn) setError(GOOGLE_NOT_READY);
+  };
 
-  // Not set up yet: hidden behind FEATURES.googleSignIn.
-  const continueWithGoogle = () => {};
+  const canLogIn = isEmail(email) && password.length > 0;
   const submit = async () => {
     if (!canLogIn || busy) return;
     setBusy(true);
@@ -54,8 +61,10 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      title="Welcome back"
-      subtitle="Log in to your account."
+      // Top 40% left empty for now; the choices, then the form, take the bottom 60%.
+      split
+      title="Log in to your account"
+      onBack={withEmail ? showChoices : undefined}
       footer={
         <FooterPrompt
           prompt="Don’t have an account?"
@@ -64,45 +73,66 @@ export default function LoginScreen() {
         />
       }
     >
-      {FEATURES.googleSignIn ? (
+      {withEmail ? (
         <>
-          <GoogleButton onPress={continueWithGoogle} />
-          <OrDivider />
+          <AuthField
+            minimal
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            submitBehavior="submit"
+            // Chose email: ready to type.
+            autoFocus
+            onSubmitEditing={() => passwordRef.current?.focus()}
+          />
+          <AuthField
+            ref={passwordRef}
+            minimal
+            label="Password"
+            secure
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            autoCapitalize="none"
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={submit}
+          />
+          {/* Under the password box, at its right end (there's no label row to sit in). */}
+          <View style={styles.forgot}>
+            <TextLink onPress={() => router.push('/forgot-password')}>Forgot password?</TextLink>
+          </View>
+
+          <ErrorMessage message={error} />
+          <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
         </>
-      ) : null}
-
-      <AuthField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        autoComplete="email"
-        textContentType="emailAddress"
-        returnKeyType="next"
-        submitBehavior="submit"
-        onSubmitEditing={() => passwordRef.current?.focus()}
-      />
-      <AuthField
-        ref={passwordRef}
-        label="Password"
-        labelAction={
-          <TextLink onPress={() => router.push('/forgot-password')}>Forgot password?</TextLink>
-        }
-        secure
-        value={password}
-        onChangeText={setPassword}
-        placeholder="Your password"
-        autoCapitalize="none"
-        autoComplete="current-password"
-        textContentType="password"
-        returnKeyType="go"
-        onSubmitEditing={submit}
-      />
-
-      <ErrorMessage message={error} />
-      <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
+      ) : (
+        <>
+          <View style={styles.choices}>
+            <GoogleButton onPress={continueWithGoogle} />
+            <EmailButton onPress={showEmailForm} />
+          </View>
+          <ErrorMessage message={error} />
+        </>
+      )}
     </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  choices: {
+    gap: 12,
+  },
+  // A little closer to the box it belongs to than the form's usual gap.
+  forgot: {
+    alignSelf: 'flex-end',
+    marginTop: -4,
+  },
+});

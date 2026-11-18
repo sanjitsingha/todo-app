@@ -52,6 +52,9 @@ export function ErrorMessage({ message }: { message: string | null }) {
   );
 }
 
+/** What "Continue with Google" says while Google sign-in isn't set up (FEATURES.googleSignIn). */
+export const GOOGLE_NOT_READY = 'Google sign-in isn’t ready yet. Continue with email for now.';
+
 /** White outlined button with the Google "G". */
 export function GoogleButton({ onPress }: { onPress: () => void }) {
   return (
@@ -62,6 +65,20 @@ export function GoogleButton({ onPress }: { onPress: () => void }) {
     >
       <Ionicons name="logo-google" size={18} color={colors.ink} />
       <Text style={styles.outlineText}>Continue with Google</Text>
+    </Pressable>
+  );
+}
+
+/** Yellow button with an envelope, beside "Continue with Google" on the login screen. */
+export function EmailButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.button, styles.fill, pressed && styles.primaryPressed]}
+      accessibilityRole="button"
+    >
+      <Ionicons name="mail-outline" size={18} color={colors.onPrimary} />
+      <Text style={styles.primaryText}>Continue with email</Text>
     </Pressable>
   );
 }
@@ -114,6 +131,9 @@ const styles = StyleSheet.create({
   },
   primary: {
     marginTop: 8,
+    backgroundColor: colors.primary,
+  },
+  fill: {
     backgroundColor: colors.primary,
   },
   primaryPressed: {
