@@ -5,23 +5,20 @@ import type { TextInputInstance } from 'react-native';
 import {
   ErrorMessage,
   FooterPrompt,
-  GOOGLE_NOT_READY,
   GoogleButton,
   OrDivider,
   PrimaryButton,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
-import { FEATURES } from '@/constants/features';
-import { isEmail, MIN_PASSWORD_LENGTH } from '@/lib/validation';
+import { isEmail, MIN_PASSWORD_LENGTH, passwordProblem } from '@/lib/validation';
 import { signUp } from '@/store/auth';
 
 /**
- * Sign up, laid out like the login screen: the name, email and password form (through
- * Supabase; src/store/auth.tsx), with Continue with Google under its Create account button.
- * Google works once it's set up (FEATURES.googleSignIn); until then it says so. Signed up, it
- * goes back to where it was opened from, signed in. If the project asks new accounts to
- * confirm their email first, it says to check the inbox instead.
+ * Sign up, opened on top of log in and laid out like it: the name, email and password form
+ * (through Supabase; src/store/auth.tsx), with Continue with Google under its Create account
+ * button. Signed up, the app takes over by itself, signed in. If the project asks new accounts
+ * to confirm their email first, it says to check the inbox instead, then back to log in.
  */
 export default function RegisterScreen() {
   const router = useRouter();
@@ -34,10 +31,8 @@ export default function RegisterScreen() {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  // Not set up yet: says so instead of doing nothing (FEATURES.googleSignIn).
-  const continueWithGoogle = () => {
-    if (!FEATURES.googleSignIn) setError(GOOGLE_NOT_READY);
-  };
+  // Back down to log in, which is always under this screen (or opens it, if it somehow isn't).
+  const goToLogIn = () => router.dismissTo('/login');
 
   const canRegister =
     name.trim().length > 0 && isEmail(email) && password.length >= MIN_PASSWORD_LENGTH;
@@ -49,7 +44,7 @@ export default function RegisterScreen() {
     setBusy(false);
     if (result.error) setError(result.error);
     else if (result.confirm) setConfirming(true);
-    else router.back();
+    // Otherwise signed in: the app takes over from these screens by itself.
   };
 
   if (confirming) {
@@ -59,7 +54,7 @@ export default function RegisterScreen() {
         title="Check your email"
         subtitle={`We sent a link to ${email.trim()}. Open it to confirm, then log in.`}
       >
-        <PrimaryButton label="Go to log in" onPress={() => router.replace('/login')} />
+        <PrimaryButton label="Go to log in" onPress={goToLogIn} />
       </AuthScreen>
     );
   }
@@ -71,11 +66,7 @@ export default function RegisterScreen() {
       split
       title="Create your account"
       footer={
-        <FooterPrompt
-          prompt="Already have an account?"
-          action="Log in"
-          onPress={() => router.replace('/login')}
-        />
+        <FooterPrompt prompt="Already have an account?" action="Log in" onPress={goToLogIn} />
       }
     >
       <AuthField
@@ -110,7 +101,7 @@ export default function RegisterScreen() {
         ref={passwordRef}
         minimal
         label="Password"
-        hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
+        error={passwordProblem(password)}
         secure
         value={password}
         onChangeText={setPassword}
@@ -131,7 +122,7 @@ export default function RegisterScreen() {
       />
 
       <OrDivider />
-      <GoogleButton onPress={continueWithGoogle} />
+      <GoogleButton onError={setError} />
     </AuthScreen>
   );
 }

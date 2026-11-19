@@ -14,9 +14,10 @@ export const FEATURES = {
    */
   goalRingInHeader: false,
   /**
-   * Google sign-in. Off until it's set up (it needs a development build and Google Cloud keys);
-   * email and password work meanwhile. Off, "Continue with Google" on the login and sign-up
-   * screens says it isn't ready yet.
+   * Google sign-in ("Continue with Google" on the login and sign-up screens), through the
+   * Google provider in Supabase Auth, in the in-app browser; it works in Expo Go too. It needs
+   * that provider turned on in Supabase (supabase/GOOGLE_SETUP.md). Off, the button says it
+   * isn't ready yet, and email and password still work.
    */
-  googleSignIn: false,
+  googleSignIn: true,
 };

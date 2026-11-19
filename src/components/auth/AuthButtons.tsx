@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { FEATURES } from '@/constants/features';
 import { colors } from '@/constants/theme';
+import { signInWithGoogle } from '@/store/auth';
 
 /**
  * The main action of an auth screen. Same look as the "Add todo" button. While `loading`, it
@@ -52,19 +54,48 @@ export function ErrorMessage({ message }: { message: string | null }) {
   );
 }
 
-/** What "Continue with Google" says while Google sign-in isn't set up (FEATURES.googleSignIn). */
-export const GOOGLE_NOT_READY = 'Google sign-in isn’t ready yet. Use your email for now.';
+/** What "Continue with Google" says while Google sign-in is off (FEATURES.googleSignIn). */
+const GOOGLE_NOT_READY = 'Google sign-in isn’t ready yet. Use your email for now.';
 
-/** White outlined button with the Google "G". */
-export function GoogleButton({ onPress }: { onPress: () => void }) {
+/**
+ * White outlined button with the Google "G": signs in with Google (src/store/auth.tsx). Once
+ * signed in, the app takes over from the login screens by itself. What goes wrong goes to
+ * `onError` (null when it starts again), for the screen's error line. While Google's page is
+ * open, a spinner shows instead of the label.
+ */
+export function GoogleButton({ onError }: { onError: (message: string | null) => void }) {
+  const [busy, setBusy] = useState(false);
+
+  const continueWithGoogle = async () => {
+    if (busy) return;
+    if (!FEATURES.googleSignIn) {
+      onError(GOOGLE_NOT_READY);
+      return;
+    }
+    onError(null);
+    setBusy(true);
+    const problem = await signInWithGoogle();
+    setBusy(false);
+    if (problem) onError(problem);
+  };
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={continueWithGoogle}
+      disabled={busy}
       style={({ pressed }) => [styles.button, styles.outline, pressed && styles.outlinePressed]}
       accessibilityRole="button"
+      accessibilityLabel="Continue with Google"
+      accessibilityState={{ busy }}
     >
-      <Ionicons name="logo-google" size={18} color={colors.ink} />
-      <Text style={styles.outlineText}>Continue with Google</Text>
+      {busy ? (
+        <ActivityIndicator color={colors.ink} />
+      ) : (
+        <>
+          <Ionicons name="logo-google" size={18} color={colors.ink} />
+          <Text style={styles.outlineText}>Continue with Google</Text>
+        </>
+      )}
     </Pressable>
   );
 }

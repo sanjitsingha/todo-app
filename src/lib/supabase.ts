@@ -24,6 +24,9 @@ export const supabase: SupabaseClient<Database> | null =
           persistSession: true,
           // Phones have no page URL to read a sign-in from.
           detectSessionInUrl: false,
+          // Google sign-in comes back to the app with a one-time code, not the tokens themselves
+          // (src/store/auth.tsx, signInWithGoogle).
+          flowType: 'pkce',
         },
       })
     : null;

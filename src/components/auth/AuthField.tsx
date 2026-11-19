@@ -19,8 +19,10 @@ type Props = Omit<TextInputProps, 'style' | 'secureTextEntry' | 'ref'> & {
   labelAction?: ReactNode;
   /** Hides what's typed, with an eye button to show it. */
   secure?: boolean;
-  /** A line of help under the field, e.g. "At least 8 characters". */
+  /** A line of help under the field. */
   hint?: string;
+  /** What's wrong with what's typed, e.g. "At least 8 characters": in red, in place of `hint`. */
+  error?: string | null;
   /**
    * Just the soft gray box, the same while you type in it: no label above it (`label` is still
    * what screen readers say, and `labelAction` isn't shown), so the placeholder says what goes
@@ -39,6 +41,7 @@ export function AuthField({
   labelAction,
   secure = false,
   hint,
+  error,
   minimal = false,
   onFocus,
   onBlur,
@@ -94,7 +97,13 @@ export function AuthField({
         ) : null}
       </View>
 
-      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
+      {error ? (
+        <Text style={[styles.hint, styles.error]} accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : hint ? (
+        <Text style={styles.hint}>{hint}</Text>
+      ) : null}
     </View>
   );
 }
@@ -147,5 +156,8 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     color: colors.textMuted,
+  },
+  error: {
+    color: colors.danger,
   },
 });

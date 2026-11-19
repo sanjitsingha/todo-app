@@ -27,16 +27,21 @@ type Props = {
   split?: boolean;
   /** What goes in the top part of a split screen, under the back arrow. */
   top?: ReactNode;
+  /**
+   * False for a screen with nothing to go back to (log in, which is where signed out starts,
+   * and new password). Its room is kept, so the title sits where it does on the others.
+   */
+  showBack?: boolean;
 };
 
 /** How much of the screen's height the top part of a split screen takes, at most. */
 const SPLIT_TOP = 0.6;
 
 /**
- * The frame shared by the login, register and forgot-password screens: a back arrow, a title
- * and subtitle, the form, and a footer at the bottom. Stays above the keyboard (Android apps
- * are edge-to-edge, so the window doesn't resize for it; "padding" is what Expo recommends on
- * both platforms) and scrolls on small screens.
+ * The frame shared by the login, register, forgot password and new password screens: a back
+ * arrow, a title and subtitle, the form, and a footer at the bottom. Stays above the keyboard
+ * (Android apps are edge-to-edge, so the window doesn't resize for it; "padding" is what Expo
+ * recommends on both platforms) and scrolls on small screens.
  */
 export function AuthScreen({
   title,
@@ -45,8 +50,16 @@ export function AuthScreen({
   footer,
   split = false,
   top,
+  showBack = true,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const back = showBack ? (
+    <View style={styles.back}>
+      <BackButton />
+    </View>
+  ) : (
+    <View style={styles.noBack} />
+  );
   // The height the split screen has to show itself in: the window's, until it's laid out. It
   // loses the keyboard's height while that's up (the padding below), so the top part gives up
   // its room first and the form stays above the keyboard.
@@ -80,9 +93,7 @@ export function AuthScreen({
           <View
             style={[styles.top, { maxHeight: height * SPLIT_TOP, paddingTop: insets.top + 8 }]}
           >
-            <View style={styles.back}>
-              <BackButton />
-            </View>
+            {back}
             {top}
           </View>
 
@@ -111,9 +122,7 @@ export function AuthScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.back}>
-          <BackButton />
-        </View>
+        {back}
 
         {form}
       </ScrollView>
@@ -155,6 +164,12 @@ const styles = StyleSheet.create({
   back: {
     alignSelf: 'flex-start',
     marginStart: -16,
+    marginBottom: 24,
+  },
+  // The back arrow's room when there isn't one: the button (24 icon + 8 padding each side)
+  // and its margin below.
+  noBack: {
+    height: 40,
     marginBottom: 24,
   },
   title: {

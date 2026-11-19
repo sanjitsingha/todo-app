@@ -1,11 +1,10 @@
-import { useIsFocused, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useRef, useState } from 'react';
 import { StyleSheet, View, type TextInputInstance } from 'react-native';
 
 import {
   ErrorMessage,
   FooterPrompt,
-  GOOGLE_NOT_READY,
   GoogleButton,
   OrDivider,
   PrimaryButton,
@@ -13,16 +12,15 @@ import {
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
-import { FEATURES } from '@/constants/features';
 import { isEmail } from '@/lib/validation';
-import { logIn, useAuth } from '@/store/auth';
+import { logIn } from '@/store/auth';
 
 /**
- * Log in: the email and password form (through Supabase; src/store/auth.tsx), with Continue
- * with Google under its Log in button, and a "New here? Create an account" line at the bottom
- * (it opens sign up instead). Google works once it's set up (FEATURES.googleSignIn); until then
- * it says so. As soon as someone is signed in (here, or by setting a new password on the screen
- * above it) it closes, back to where it was opened from; the todos then sync with the account.
+ * Log in: where the app starts when no one's signed in (signing in is required;
+ * src/app/_layout.tsx). The email and password form (through Supabase; src/store/auth.tsx),
+ * with Continue with Google under its Log in button, and a "New here? Create an account" line
+ * at the bottom (it opens sign up on top). Logged in either way, the app takes over by itself,
+ * on the Todo tab; the todos then sync with the account. No back arrow: nothing's behind it.
  */
 export default function LoginScreen() {
   const router = useRouter();
@@ -32,22 +30,6 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Only while it's the screen showing, so a sign-in from the password screen above it waits
-  // until that screen has closed.
-  const { user } = useAuth();
-  const focused = useIsFocused();
-  useEffect(() => {
-    if (user && focused) router.back();
-  }, [user, focused, router]);
-
-  // Not set up yet: says so instead of doing nothing (FEATURES.googleSignIn).
-  const continueWithGoogle = () => {
-    if (!FEATURES.googleSignIn) setError(GOOGLE_NOT_READY);
-  };
-
-  // Swaps this screen for sign up, so back from there goes to where login was opened from.
-  const goToSignUp = () => router.replace('/register');
-
   const canLogIn = isEmail(email) && password.length > 0;
   const submit = async () => {
     if (!canLogIn || busy) return;
@@ -55,7 +37,6 @@ export default function LoginScreen() {
     setError(null);
     const problem = await logIn(email, password);
     setBusy(false);
-    // Signed in, the screen closes itself (above).
     if (problem) setError(problem);
   };
 
@@ -63,9 +44,14 @@ export default function LoginScreen() {
     <AuthScreen
       // Top 60% left empty for now; the form takes the bottom 40%, and more when it needs it.
       split
+      showBack={false}
       title="Log in to your account"
       footer={
-        <FooterPrompt prompt="New here?" action="Create an account" onPress={goToSignUp} />
+        <FooterPrompt
+          prompt="New here?"
+          action="Create an account"
+          onPress={() => router.push('/register')}
+        />
       }
     >
       <AuthField
@@ -105,7 +91,7 @@ export default function LoginScreen() {
       <PrimaryButton label="Log in" onPress={submit} disabled={!canLogIn} loading={busy} />
 
       <OrDivider />
-      <GoogleButton onPress={continueWithGoogle} />
+      <GoogleButton onError={setError} />
     </AuthScreen>
   );
 }

@@ -1,36 +1,37 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import type { TextInputInstance } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ErrorMessage, FooterPrompt, PrimaryButton } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthScreen } from '@/components/auth/AuthScreen';
-import { isEmail, MIN_PASSWORD_LENGTH } from '@/lib/validation';
-import { resetPassword, sendResetCode } from '@/store/auth';
-
-/** Supabase's email codes are 6 digits unless the project sets them longer (up to 10). */
-const MIN_CODE_LENGTH = 6;
-const MAX_CODE_LENGTH = 10;
+import { OtpInput } from '@/components/auth/OtpInput';
+import { isEmail } from '@/lib/validation';
+import { sendResetCode, verifyResetCode } from '@/store/auth';
 
 /**
- * Setting a new password, in two steps: the email you signed up with, then the code emailed to
- * it with your new password. It's a code rather than a link so it works without the email
- * having to open the app (Supabase's "Reset password" email template shows it as {{ .Token }}).
- * Done, you're signed in, and the login screen underneath closes too.
+ * How many digits the emailed code has. Must match "Email OTP Length" in the Supabase project's
+ * Auth settings (6 unless it's been changed): it's how many boxes there are to type it in.
+ */
+const CODE_LENGTH = 6;
+
+/**
+ * Forgot password, in two steps: the email you signed up with, then the code emailed to it, in
+ * a row of boxes. It's a code rather than a link so it works without the email having to open
+ * the app: Supabase's "Reset password" email template has to show {{ .Token }} rather than the
+ * default link (supabase/templates/reset-password.html is the one to paste in). The right code
+ * signs you in, and the app swaps these screens for the new password screen by itself
+ * (new-password.tsx; src/app/_layout.tsx).
  */
 export default function ForgotPasswordScreen() {
   const router = useRouter();
-  const passwordRef = useRef<TextInputInstance>(null);
   const [email, setEmail] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
   const [code, setCode] = useState('');
-  const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSend = isEmail(email);
-  const canReset =
-    code.trim().length >= MIN_CODE_LENGTH && password.length >= MIN_PASSWORD_LENGTH;
 
   const sendCode = async () => {
     if (!canSend || busy) return;
@@ -45,22 +46,26 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const submit = async () => {
-    if (!canReset || busy) return;
+  // Runs by itself once the last box is filled, and from the button (to try again). The ref
+  // stops a second check while one's under way (autofill can fill the boxes twice at once).
+  const verifying = useRef(false);
+  const verify = async (value: string) => {
+    if (value.length < CODE_LENGTH || verifying.current) return;
+    verifying.current = true;
     setBusy(true);
     setError(null);
-    const problem = await resetPassword(email, code, password);
+    const problem = await verifyResetCode(email, value);
+    verifying.current = false;
     setBusy(false);
+    // Right, and the new password screen takes over from these by itself.
     if (problem) setError(problem);
-    // Signed in: back to the login screen, which closes itself now there's a sign-in.
-    else router.back();
   };
 
   if (step === 'code') {
     return (
       <AuthScreen
         title="Check your email"
-        subtitle={`We sent a code to ${email.trim()}. Enter it and choose a new password.`}
+        subtitle={`Enter the ${CODE_LENGTH}-digit code we sent to ${email.trim()}.`}
         footer={
           <FooterPrompt
             prompt="Didn’t get it?"
@@ -72,39 +77,20 @@ export default function ForgotPasswordScreen() {
           />
         }
       >
-        <AuthField
+        <OtpInput
           label="Code"
+          length={CODE_LENGTH}
           value={code}
-          onChangeText={(value) => setCode(value.replace(/\D/g, ''))}
-          placeholder="123456"
-          keyboardType="number-pad"
-          maxLength={MAX_CODE_LENGTH}
-          autoComplete="one-time-code"
-          textContentType="oneTimeCode"
-          returnKeyType="next"
-          submitBehavior="submit"
-          onSubmitEditing={() => passwordRef.current?.focus()}
-        />
-        <AuthField
-          ref={passwordRef}
-          label="New password"
-          hint={`At least ${MIN_PASSWORD_LENGTH} characters`}
-          secure
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Choose a new password"
-          autoCapitalize="none"
-          autoComplete="new-password"
-          textContentType="newPassword"
-          returnKeyType="go"
-          onSubmitEditing={submit}
+          onChangeText={setCode}
+          onComplete={verify}
+          autoFocus
         />
 
         <ErrorMessage message={error} />
         <PrimaryButton
-          label="Set new password"
-          onPress={submit}
-          disabled={!canReset}
+          label="Verify"
+          onPress={() => verify(code)}
+          disabled={code.length < CODE_LENGTH}
           loading={busy}
         />
       </AuthScreen>
@@ -115,15 +101,13 @@ export default function ForgotPasswordScreen() {
     <AuthScreen
       title="Forgot password?"
       subtitle="Enter the email you signed up with and we’ll send you a code to reset it."
-      footer={
-        <FooterPrompt prompt="Remembered it?" action="Log in" onPress={() => router.back()} />
-      }
     >
       <AuthField
+        minimal
         label="Email"
         value={email}
         onChangeText={setEmail}
-        placeholder="you@example.com"
+        placeholder="Email"
         keyboardType="email-address"
         autoCapitalize="none"
         autoComplete="email"
@@ -134,6 +118,21 @@ export default function ForgotPasswordScreen() {
 
       <ErrorMessage message={error} />
       <PrimaryButton label="Send code" onPress={sendCode} disabled={!canSend} loading={busy} />
+      {/* Right under the button, not pinned to the bottom of the screen. */}
+      <View style={styles.remembered}>
+        {/* Back to the login screen, or opens it when it isn't behind this one. */}
+        <FooterPrompt
+          prompt="Remembered it?"
+          action="Log in"
+          onPress={() => router.dismissTo('/login')}
+        />
+      </View>
     </AuthScreen>
   );
 }
+
+const styles = StyleSheet.create({
+  remembered: {
+    alignItems: 'center',
+  },
+});

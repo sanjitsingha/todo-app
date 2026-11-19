@@ -4,6 +4,7 @@ import { AppState } from 'react-native';
 import { syncSettings } from '@/lib/settingsSync';
 import { syncTodos } from '@/lib/todoSync';
 import { useAuth } from '@/store/auth';
+import { syncGoogleCalendar } from '@/store/calendar';
 import { getSettingsSync, useSettings } from '@/store/settings';
 import { useTodos } from '@/store/todos';
 
@@ -29,6 +30,13 @@ async function runSyncs() {
         console.warn('Could not sync with your account; will try again later.', error);
         break;
       }
+      // After the todos are up, so the server sends Google the latest. Its own failures don't
+      // stop the account's syncing: the server remembers how far it got.
+      try {
+        await syncGoogleCalendar(userId);
+      } catch (error) {
+        console.warn('Could not update Google Calendar; will try again later.', error);
+      }
     }
   } finally {
     running = false;
@@ -42,9 +50,10 @@ function requestSync(userId: string) {
 
 /**
  * Keeps the phone and the signed-in account in step (todos: src/lib/todoSync.ts, settings:
- * src/lib/settingsSync.ts). It syncs on signing in (or opening the app signed in), on coming
- * back to the app, and shortly after anything changes on the phone. Signed out, it does
- * nothing, and the app works on the phone alone. Draws nothing.
+ * src/lib/settingsSync.ts), then has the todos sent on to Google Calendar when that's
+ * connected (src/store/calendar.ts). It syncs on signing in (or opening the app signed in), on
+ * coming back to the app, and shortly after anything changes on the phone. Signed out, it does
+ * nothing. Draws nothing.
  */
 export function CloudSync() {
   const { user } = useAuth();

@@ -1,6 +1,23 @@
-import { isAuthError, isAuthRetryableFetchError, type User } from '@supabase/supabase-js';
-import { createContext, use, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  isAuthError,
+  isAuthRetryableFetchError,
+  isAuthSessionMissingError,
+  type User,
+} from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import {
+  createContext,
+  use,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 
+import { AUTH_CALLBACK_PATH } from '@/constants/links';
+import { appLink } from '@/lib/appLink';
 import { supabase } from '@/lib/supabase';
 
 /** Someone signed in to the app. */
@@ -15,13 +32,39 @@ type AuthContextValue = {
   user: AuthUser | null;
   /** False until the saved sign-in (if any) has been read back at launch. */
   ready: boolean;
+  /**
+   * True from the moment a forgot password code is checked until the new password is saved.
+   * The right code signs you in, but the app keeps you on the new password screen meanwhile.
+   */
+  resettingPassword: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Kept outside React, so verifyResetCode can set it before the sign-in it brings shows up:
+// that sign-in then lands on the new password screen rather than in the app.
+let resettingPassword = false;
+const resetListeners = new Set<() => void>();
+
+function setResettingPassword(value: boolean) {
+  if (resettingPassword === value) return;
+  resettingPassword = value;
+  resetListeners.forEach((listener) => listener());
+}
+
+function subscribeToReset(listener: () => void) {
+  resetListeners.add(listener);
+  return () => {
+    resetListeners.delete(listener);
+  };
+}
+
+const getResettingPassword = () => resettingPassword;
+
 function toAuthUser(user: User | null | undefined): AuthUser | null {
   if (!user) return null;
-  const name = user.user_metadata?.name;
+  // `name` is set by sign up; Google accounts bring `name` and `full_name`.
+  const name = user.user_metadata?.name ?? user.user_metadata?.full_name;
   return {
     id: user.id,
     email: user.email ?? '',
@@ -32,11 +75,13 @@ function toAuthUser(user: User | null | undefined): AuthUser | null {
 /**
  * Who's signed in, through Supabase Auth. Reads the saved sign-in back at launch (it's kept on
  * the phone, so you stay signed in), and follows every sign-in, sign-out and token refresh
- * after that. Without Supabase keys in .env.local, no one is ever signed in.
+ * after that. Without Supabase keys in .env.local, no one is ever signed in, so the app stays
+ * on the login screen (signing in is required; src/app/_layout.tsx).
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [ready, setReady] = useState(!supabase);
+  const resetting = useSyncExternalStore(subscribeToReset, getResettingPassword);
 
   useEffect(() => {
     if (!supabase) return;
@@ -61,7 +106,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ user, ready }), [user, ready]);
+  const value = useMemo(
+    () => ({ user, ready, resettingPassword: resetting }),
+    [user, ready, resetting],
+  );
   return <AuthContext value={value}>{children}</AuthContext>;
 }
 
@@ -82,6 +130,10 @@ const NOT_SET_UP = 'Signing in isn’t set up yet.';
 function describe(error: unknown): string {
   if (isAuthRetryableFetchError(error)) {
     return 'Couldn’t reach the server. Check your internet connection and try again.';
+  }
+  // Setting a new password with no sign-in from a reset code behind it.
+  if (isAuthSessionMissingError(error)) {
+    return 'Your reset code has run out. Go back and ask for a new one.';
   }
   if (isAuthError(error)) {
     switch (error.code) {
@@ -142,7 +194,7 @@ export async function signUp(
   }
 }
 
-/** Emails a code for setting a new password (see resetPassword). */
+/** Emails a code for setting a new password (see verifyResetCode). */
 export async function sendResetCode(email: string): Promise<AuthError> {
   if (!supabase) return NOT_SET_UP;
   try {
@@ -153,30 +205,85 @@ export async function sendResetCode(email: string): Promise<AuthError> {
   }
 }
 
-/** Checks the emailed code, then sets the new password. Leaves you signed in. */
-export async function resetPassword(
-  email: string,
-  code: string,
-  password: string,
-): Promise<AuthError> {
+/**
+ * Checks the emailed code (from sendResetCode). When it's right, you're signed in, and the app
+ * shows the new password screen (setNewPassword) instead of the todos until it's saved.
+ */
+export async function verifyResetCode(email: string, code: string): Promise<AuthError> {
   if (!supabase) return NOT_SET_UP;
+  // Before checking: the sign-in a right code brings can show up before verifyOtp returns.
+  setResettingPassword(true);
   try {
-    const verified = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: code.trim(),
       type: 'recovery',
     });
-    if (verified.error) return describe(verified.error);
+    if (error) setResettingPassword(false);
+    return error ? describe(error) : null;
+  } catch (error) {
+    setResettingPassword(false);
+    return describe(error);
+  }
+}
+
+/** Sets a new password for whoever's signed in, after verifyResetCode. Then on into the app. */
+export async function setNewPassword(password: string): Promise<AuthError> {
+  if (!supabase) return NOT_SET_UP;
+  try {
     const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setResettingPassword(false);
     return error ? describe(error) : null;
   } catch (error) {
     return describe(error);
   }
 }
 
-/** Signs out on this phone. The todos stay on it. */
+/** The first value of a link's query parameter. */
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/**
+ * Signs in with Google, through the project's Google provider in Supabase Auth: Google's page
+ * opens in the in-app browser, and comes back to todoapp://auth-callback with a code that's
+ * swapped for the sign-in. Needs the Google provider turned on in Supabase, and the callback in
+ * its Redirect URLs (supabase/GOOGLE_SETUP.md). Closing the browser isn't an error: it gives
+ * back null and nothing happens. Works in Expo Go too (the callback is then exp://…, see
+ * src/lib/appLink.ts).
+ */
+export async function signInWithGoogle(): Promise<AuthError> {
+  if (!supabase) return NOT_SET_UP;
+  try {
+    const redirectTo = appLink(AUTH_CALLBACK_PATH);
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo, skipBrowserRedirect: true },
+    });
+    if (error) return describe(error);
+
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    if (result.type !== 'success') return null;
+
+    const { queryParams } = Linking.parse(result.url);
+    const code = firstParam(queryParams?.code);
+    if (!code) {
+      return (
+        firstParam(queryParams?.error_description) ??
+        'Google sign-in didn’t finish. Please try again.'
+      );
+    }
+    const exchanged = await supabase.auth.exchangeCodeForSession(code);
+    return exchanged.error ? describe(exchanged.error) : null;
+  } catch (error) {
+    return describe(error);
+  }
+}
+
+/** Signs out on this phone, back to the login screen. The todos stay on it. */
 export async function logOut(): Promise<AuthError> {
   if (!supabase) return null;
+  setResettingPassword(false);
   try {
     // Just this phone; the account stays signed in elsewhere.
     const { error } = await supabase.auth.signOut({ scope: 'local' });
