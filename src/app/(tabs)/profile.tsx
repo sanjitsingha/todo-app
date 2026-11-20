@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useUpdates } from 'expo-updates';
 // Just these icons, not the whole icon set.
 import Bot from 'lucide-react-native/icons/bot';
 import CalendarSync from 'lucide-react-native/icons/calendar-sync';
@@ -151,13 +152,17 @@ function CalendarRow({ userId }: { userId: string }) {
 /**
  * The Profile tab: the app's settings and accounts, top to bottom: Haptic Feedback, Appearance,
  * Check for Updates, Google Calendar, Connect ChatGPT, Privacy Policy, then Log Out (signing in
- * is required, so someone always is). The settings open bottom sheets: so far Haptic Feedback
- * and Appearance (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Google Calendar
- * connects in the in-app browser; the rest are in place for what comes next.
+ * is required, so someone always is). The settings open bottom sheets: Haptic Feedback,
+ * Appearance and Check for Updates (src/app/haptic-feedback.tsx, src/app/appearance.tsx,
+ * src/app/updates.tsx); Google Calendar connects in the in-app browser; the rest are in place for
+ * what comes next.
  */
 export default function ProfileScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  // The app checks for updates each time it opens and downloads one in the background; once it's
+  // down, Check for Updates says so before it's even tapped.
+  const { isUpdatePending } = useUpdates();
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -167,7 +172,12 @@ export default function ProfileScreen() {
         onPress={() => router.push('/haptic-feedback')}
       />
       <Row icon={SunMoon} title="Appearance" onPress={() => router.push('/appearance')} />
-      <Row icon={RefreshCw} title="Check for Updates" />
+      <Row
+        icon={RefreshCw}
+        title="Check for Updates"
+        accessory={isUpdatePending ? <Text style={styles.status}>Update ready</Text> : undefined}
+        onPress={() => router.push('/updates')}
+      />
       {/* No one's signed in only for a moment, while logging out moves to the login screen. */}
       {user ? <CalendarRow userId={user.id} /> : null}
       <Row icon={Bot} title="Connect ChatGPT" />

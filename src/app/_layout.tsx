@@ -48,8 +48,10 @@ function Screens() {
   const signedIn = user !== null;
   return (
     <Stack>
-      {/* First, so it's where signing in (or saving a new password) lands. */}
-      <Stack.Protected guard={signedIn && !resettingPassword}>
+      {/* First, so it's where signing in (or saving a new password) lands. Signed out, these
+          send you to Log in: the root stack has no anchor to fall back on, so opening the app
+          at / (the Todo tab) showed "Unmatched Route" on a fresh install. */}
+      <Stack.Protected guard={signedIn && !resettingPassword} redirectTo="/login">
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* Starts at 60% height, which fits the whole form down to the Add button (half
             height cut it off once the Duration row came in); drag up for full screen. */}
@@ -116,6 +118,18 @@ function Screens() {
         {/* Opened from Profile: Light, Dark or System. Just as tall as its options. */}
         <Stack.Screen
           name="appearance"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+            headerShown: false,
+          }}
+        />
+        {/* Opened from Profile: checks for an over-the-air update and offers to install it.
+            Just as tall as what it says. */}
+        <Stack.Screen
+          name="updates"
           options={{
             presentation: 'formSheet',
             sheetAllowedDetents: 'fitToContents',
