@@ -17,7 +17,7 @@ import Animated, {
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 
 import { priorityOf } from '@/components/TodoChips';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useNow } from '@/hooks/useNow';
 import { formatTime, toDateKey, toDayMinutes, type DateKey } from '@/lib/dates';
 import type { Todo } from '@/store/todos';
@@ -142,6 +142,7 @@ type Props = {
  * Todos close together stack one below another.
  */
 export function TodoTimeline({ todos, date }: Props) {
+  const styles = useStyles();
   const router = useRouter();
   const now = useNow();
   const isToday = date === toDateKey(now);
@@ -360,6 +361,7 @@ const HourRow = memo(function HourRow({
   hour: number;
   hourHeight: SharedValue<number>;
 }) {
+  const styles = useStyles();
   const position = useAnimatedStyle(() => ({
     transform: [{ translateY: offsetOf(hour * 60, hourHeight.get()) - 8 }],
   }));
@@ -384,6 +386,7 @@ function TimelineBlock({
   hourHeight: SharedValue<number>;
   children: ReactNode;
 }) {
+  const styles = useStyles();
   const position = useAnimatedStyle(() => {
     const { top, height } = blockPosition(inputs, index, hourHeight.get());
     return { height, transform: [{ translateY: top - GRID_TOP }] };
@@ -394,6 +397,7 @@ function TimelineBlock({
 
 /** The current time: a dot on the edge of the time labels and a line across. */
 function NowLine({ minutes, hourHeight }: { minutes: number; hourHeight: SharedValue<number> }) {
+  const styles = useStyles();
   const position = useAnimatedStyle(() => ({
     transform: [{ translateY: offsetOf(minutes, hourHeight.get()) - 4 }],
   }));
@@ -429,7 +433,8 @@ function TimelineChip({
   showTime?: boolean;
   fill?: boolean;
 }) {
-  const priority = priorityOf(todo);
+  const styles = useStyles();
+  const priority = priorityOf(todo, useColors());
   const time = showTime && todo.dueTime ? formatTime(todo.dueTime) : null;
 
   return (
@@ -476,7 +481,7 @@ function TimelineChip({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     flex: 1,
   },
@@ -609,4 +614,4 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.danger,
   },
-});
+}));

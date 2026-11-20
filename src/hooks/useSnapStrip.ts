@@ -12,10 +12,13 @@ import { tick } from '@/lib/feedback';
 /** Ticks closer together than this blur into a buzz, so a fast fling skips some. */
 const MIN_TICK_GAP_MS = 35;
 /**
- * When a finger lifts and no fling or snap follows (one almost always does, and reports its
- * own end), the strip is at rest where the finger left it. This is how long to wait to be sure.
+ * How long the strip has to go without moving, after a finger lifts, to count as at rest.
+ * Android reports a fling's end as soon as two frames see the same spot, which can be while
+ * its snap onto a step is still under way (more so on a busy frame). Picking there, and
+ * scrolling to the step under the center then, cut the snap off and pulled the strip back to
+ * an earlier step. Waiting for real quiet lets the snap finish first.
  */
-const SETTLE_DELAY_MS = 100;
+const QUIET_MS = 90;
 
 type ScrollEvent = NativeSyntheticEvent<NativeScrollEvent>;
 
@@ -42,9 +45,11 @@ type Options = {
  *
  * - The scroll position runs the animations on the native side (`scrollX`), so they stay smooth.
  * - Each step that crosses the center ticks (src/lib/feedback.ts) as it happens.
- * - The parent only hears about the pick once the strip comes to rest, or on a tap. Picking on
- *   every tick re-rendered the whole screen mid-swipe, which made the ticks lag, and a late
- *   render would drag the strip back to a day it had already passed.
+ * - The parent only hears about the pick once the strip comes to rest (QUIET_MS without
+ *   moving), or on a tap. Picking on every tick re-rendered the whole screen mid-swipe, which
+ *   made the ticks lag, and a late render would drag the strip back to a day it had already
+ *   passed.
+ * - A fling glides (normal deceleration) and the platform snaps it onto a step.
  * - A new `value` from outside (not from this strip) slides the strip to it.
  * - Disabled steps are skipped: no tick, no tap, and a swipe that stops on one slides on to the
  *   nearest step that can be picked.
@@ -78,13 +83,17 @@ export function useSnapStrip({
   const strip = useRef({
     /** The step under the center, as last seen from scroll updates. */
     centered: initialIndex,
+    /** Where the strip is, as last seen from scroll updates. */
+    x: initialIndex * step,
+    /** A finger has lifted, and the strip hasn't come to rest yet. */
+    settling: false,
     /** The step the parent has, as far as the strip knows. */
     picked: initialIndex,
     /** Where the strip is sliding by itself (after a tap or an outside change), if it is. */
     slideTarget: null as number | null,
     dragging: false,
     lastTickAt: 0,
-    settleTimer: undefined as ReturnType<typeof setTimeout> | undefined,
+    quietTimer: undefined as ReturnType<typeof setTimeout> | undefined,
   });
 
   const indexAt = useCallback(
@@ -121,7 +130,8 @@ export function useSnapStrip({
   const settle = useCallback(
     (x: number) => {
       const s = strip.current;
-      clearTimeout(s.settleTimer);
+      clearTimeout(s.quietTimer);
+      s.settling = false;
       if (s.dragging) return;
 
       const under = indexAt(x);
@@ -129,7 +139,7 @@ export function useSnapStrip({
       // the strip just rests and nothing is picked.
       const enabled = nearestEnabled(under);
       const index = enabled ?? under;
-      // Never rest between two steps.
+      // Never rest between two steps. (Rare now: the platform's snap has had time to finish.)
       if (Math.abs(x - index * step) > 1) latest.current.scrollTo(index * step, true);
 
       if (enabled !== null && s.slideTarget === null && index !== s.picked) {
@@ -140,10 +150,23 @@ export function useSnapStrip({
     [indexAt, nearestEnabled, step],
   );
 
+  // Settles once the strip has gone QUIET_MS without moving; each movement starts the wait over.
+  const settleRef = useRef(settle);
+  useEffect(() => {
+    settleRef.current = settle;
+  });
+  const waitForQuiet = useCallback(() => {
+    const s = strip.current;
+    clearTimeout(s.quietTimer);
+    s.quietTimer = setTimeout(() => settleRef.current(s.x), QUIET_MS);
+  }, []);
+
   // Each time a new step crosses the center during a swipe, tick (but not for disabled ones).
   useEffect(() => {
     const id = scrollX.addListener(({ value: x }) => {
       const s = strip.current;
+      s.x = x;
+      if (s.settling) waitForQuiet();
       const index = indexAt(x);
       if (index === s.centered) return;
       s.centered = index;
@@ -159,7 +182,7 @@ export function useSnapStrip({
       tick();
     });
     return () => scrollX.removeListener(id);
-  }, [scrollX, indexAt]);
+  }, [scrollX, indexAt, waitForQuiet]);
 
   // The parent picked a step itself (not through this strip): slide to it. Left alone while a
   // finger is on the strip; the swipe picks a step when it ends.
@@ -172,7 +195,7 @@ export function useSnapStrip({
 
   useEffect(() => {
     const s = strip.current;
-    return () => clearTimeout(s.settleTimer);
+    return () => clearTimeout(s.quietTimer);
   }, []);
 
   /** Picks a step and slides it to the center, as for a tap. Disabled steps are ignored. */
@@ -199,7 +222,8 @@ export function useSnapStrip({
   const scrollProps = useMemo(
     () => ({
       snapToInterval,
-      decelerationRate: 'fast' as const,
+      // A fling glides on rather than stopping short; the snap still lands it on a step.
+      decelerationRate: 'normal' as const,
       scrollEventThrottle: 16,
       onScroll: Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
         useNativeDriver: true,
@@ -207,20 +231,25 @@ export function useSnapStrip({
       onScrollBeginDrag: () => {
         const s = strip.current;
         s.dragging = true;
+        s.settling = false;
         // A swipe takes over from a slide in progress.
         s.slideTarget = null;
-        clearTimeout(s.settleTimer);
+        clearTimeout(s.quietTimer);
       },
       onScrollEndDrag: (event: ScrollEvent) => {
         const s = strip.current;
         s.dragging = false;
-        const x = event.nativeEvent.contentOffset.x;
-        s.settleTimer = setTimeout(() => settle(x), SETTLE_DELAY_MS);
+        s.settling = true;
+        s.x = event.nativeEvent.contentOffset.x;
+        // A fling or snap that follows keeps moving it, and each move starts the wait over.
+        waitForQuiet();
       },
-      onMomentumScrollBegin: () => clearTimeout(strip.current.settleTimer),
-      onMomentumScrollEnd: (event: ScrollEvent) => settle(event.nativeEvent.contentOffset.x),
+      // Only a hint: the strip may still be snapping. It settles once it's quiet.
+      onMomentumScrollEnd: () => {
+        if (strip.current.settling) waitForQuiet();
+      },
     }),
-    [snapToInterval, scrollX, settle],
+    [snapToInterval, scrollX, waitForQuiet],
   );
 
   return { step, scrollX, scrollProps, pick, recenter };

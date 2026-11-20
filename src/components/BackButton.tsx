@@ -2,13 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { useColors } from '@/hooks/useTheme';
 
 /**
  * Back arrow for a screen header. Goes back like the system back button, or to the Todo
  * screen when there's nothing to go back to.
  */
 export function BackButton() {
+  const colors = useColors();
   const router = useRouter();
 
   const goBack = () => {

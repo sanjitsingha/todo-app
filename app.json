@@ -2,10 +2,10 @@
   "expo": {
     "name": "Dooist",
     "slug": "todo-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -36,7 +36,16 @@
         }
       ],
       "expo-asset",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 150,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ]
     ],
     "scheme": "todoapp",
     "experiments": {
@@ -45,6 +54,20 @@
     "extra": {
       "eas": {
         "projectId": "99e3ec8d-bc4f-4576-9a39-3921efa69e54"
+      },
+      "release": {
+        "version": "1.1.1",
+        "notes": [
+          "A new dark look, built on deep, neutral grays.",
+          "The Dooist orange on buttons, checkboxes and the Stats chart, and on today's date in the date strip.",
+          "Calendar: connect Google Calendar, see your Google events in Today, and switch todo sync on or off.",
+          "Account: see your picture and email, change your name, set a password, or delete your account.",
+          "Notifications: tap the bell at the top of Profile.",
+          "Delete a todo from its details, with the trash icon beside its name.",
+          "Smoother swiping in the date strip and time pickers, with a steady tick.",
+          "Add time now starts at the current time.",
+          "Check for Updates opens its own page, with what's new in each update."
+        ]
       }
     },
     "owner": "sanjit.dev",

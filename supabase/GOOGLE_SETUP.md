@@ -16,12 +16,13 @@ In [Google Cloud Console](https://console.cloud.google.com/), pick or create a p
 1. **APIs & Services → Library**: enable the **Google Calendar API**.
 2. **Google Auth Platform → Branding**: set the app name to **Dooist** and add a support email.
 3. **Audience**: choose External. While it's in **Testing**, add every Google account that will sign in or connect as a test user.
-4. **Data Access → Add or remove scopes**: add these three:
+4. **Data Access → Add or remove scopes**: add these four:
    - `openid`
    - `.../auth/userinfo.email`
    - `.../auth/calendar.app.created`
+   - `.../auth/calendar.events.readonly`
 
-   The last one lets Dooist make its own calendars and manage events on them. It can't see or change any other calendar.
+   `calendar.app.created` lets Dooist make its own calendars and manage events on them. It can't see or change any other calendar. `calendar.events.readonly` lets it read (never change) the events in the person's primary calendar, for **Show calendar events in Dooist** on the Calendar page. It's only asked for when that's switched on.
 5. **Clients → Create client → Web application**. Choose Web application, not Android or iOS, even though Dooist is a phone app. Sign-in and Calendar both finish on a server (Supabase), which needs the client secret that only Web clients have. You don't need a package name or SHA-1. Leave **Authorized JavaScript origins** empty. Under **Authorized redirect URIs**, add both of these:
    - `https://<ref>.supabase.co/auth/v1/callback` (for Google sign-in)
    - `https://<ref>.supabase.co/functions/v1/google-calendar/callback` (for Calendar)

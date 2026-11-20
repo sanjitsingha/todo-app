@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { formatDueDateTime, type DateKey, type TimeKey } from '@/lib/dates';
 
 type Props = {
@@ -20,6 +20,8 @@ type Props = {
  * `dueDate` / `dueTime` params.
  */
 export function DueDateField({ value, time, reminderTime, duration }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const label = formatDueDateTime(value, time);
 
@@ -57,7 +59,7 @@ export function DueDateField({ value, time, reminderTime, duration }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Plain row, like the text fields above it.
   row: {
     minHeight: 52,
@@ -85,4 +87,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.ink,
   },
-});
+}));

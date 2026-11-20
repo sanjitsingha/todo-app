@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { PRIORITIES } from '@/constants/priority';
-import { colors } from '@/constants/theme';
+import { priorityLevels } from '@/constants/priority';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { Priority } from '@/store/todos';
 
 type Props = {
@@ -15,7 +15,9 @@ type Props = {
  * the three levels as pills on the right. One tap picks a level; the picked one gets its color.
  */
 export function PriorityField({ value, onChange }: Props) {
-  const selected = PRIORITIES.find((priority) => priority.value === value) ?? PRIORITIES[1];
+  const styles = useStyles();
+  const priorities = priorityLevels(useColors());
+  const selected = priorities.find((priority) => priority.value === value) ?? priorities[1];
 
   return (
     <View style={styles.row}>
@@ -25,7 +27,7 @@ export function PriorityField({ value, onChange }: Props) {
       </View>
 
       <View style={styles.options} accessibilityRole="radiogroup" accessibilityLabel="Priority">
-        {PRIORITIES.map((priority) => {
+        {priorities.map((priority) => {
           const isSelected = priority.value === value;
           return (
             <Pressable
@@ -57,7 +59,7 @@ export function PriorityField({ value, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same height and label style as the Due date row above it.
   row: {
     minHeight: 52,
@@ -91,4 +93,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textMuted,
   },
-});
+}));

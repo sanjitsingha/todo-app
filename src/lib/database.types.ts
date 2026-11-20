@@ -52,6 +52,12 @@ export type CalendarConnectionRow = {
   fresh_calendar: boolean;
   /** 'revoked' or 'calendar_deleted' when it stopped by itself. */
   last_error: string | null;
+  /** Todo sync: todos are sent to the Dooist calendar. */
+  sync_todos: boolean;
+  /** Events: the person's Google Calendar events show in Dooist. */
+  show_events: boolean;
+  /** Google gave Dooist permission to read events. */
+  can_read_events: boolean;
   updated_at: string;
 };
 

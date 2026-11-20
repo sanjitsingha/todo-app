@@ -32,7 +32,7 @@ import {
   STICKY_SIZE,
   stickyFill,
 } from '@/constants/sticky';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { Placement, WallSize } from '@/lib/stickyLayout';
 import type { StickyColor } from '@/store/stickies';
 
@@ -96,6 +96,8 @@ export function StickyEditor({
   onDone,
   onRemove,
 }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const [text, setText] = useState(initialText);
   const [color, setColor] = useState(initialColor);
   // Shown by the buttons; the ref stops a second tap from closing it twice before that.
@@ -280,8 +282,8 @@ export function StickyEditor({
             maxLength={STICKY_MAX_LENGTH}
             placeholder="Write something…"
             placeholderTextColor={colors.textMuted}
-            selectionColor={colors.ink}
-            cursorColor={colors.ink}
+            selectionColor={colors.stickyInk}
+            cursorColor={colors.stickyInk}
             style={[
               styles.input,
               {
@@ -327,7 +329,7 @@ export function StickyEditor({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   veil: {
     ...StyleSheet.absoluteFill,
     backgroundColor: colors.wallVeil,
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontWeight: '500',
-    color: colors.ink,
+    color: colors.stickyInk,
     textAlignVertical: 'top',
   },
   swatches: {
@@ -409,4 +411,4 @@ const styles = StyleSheet.create({
     outlineStyle: 'solid',
     outlineColor: colors.ink,
   },
-});
+}));

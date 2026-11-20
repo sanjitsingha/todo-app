@@ -11,7 +11,7 @@ import {
   type PressableInstance,
 } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 export type DropdownOption<T extends string> = {
   value: T;
@@ -55,6 +55,8 @@ export function Dropdown<T extends string>({
   accessibilityLabel,
   align = 'left',
 }: Props<T>) {
+  const styles = useStyles();
+  const colors = useColors();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const triggerRef = useRef<PressableInstance>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -173,7 +175,7 @@ export function Dropdown<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   trigger: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
@@ -220,4 +222,4 @@ const styles = StyleSheet.create({
   itemTextSelected: {
     color: colors.ink,
   },
-});
+}));

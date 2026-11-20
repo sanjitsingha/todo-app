@@ -2,7 +2,7 @@
 import GalleryVertical from 'lucide-react-native/icons/gallery-vertical';
 import Rows3 from 'lucide-react-native/icons/rows-3';
 import { startTransition, useCallback, useDeferredValue, useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { DateHeader } from '@/components/DateHeader';
@@ -11,7 +11,7 @@ import { DayPager } from '@/components/DayPager';
 import { DayTodos, useDayTodos } from '@/components/DayTodos';
 import { GoalRing } from '@/components/GoalRing';
 import { FEATURES } from '@/constants/features';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { DateKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 import { updateSettings, useSettings } from '@/store/settings';
@@ -30,6 +30,8 @@ const GALLERY_ICON_SIZE = VIEW_ICON_SIZE * (ROWS_ICON_UNITS / GALLERY_ICON_UNITS
 const GALLERY_STROKE = LUCIDE_STROKE * (VIEW_ICON_SIZE / GALLERY_ICON_SIZE);
 
 export default function TodoScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const { today, selectedDate, selectDate } = useSelectedDate();
   // List or timeline; remembered between launches.
   const { todoView } = useSettings();
@@ -107,8 +109,8 @@ export default function TodoScreen() {
         follow={swipePosition}
       />
 
-      {/* Everything below the date strip sits on plain white. The day's todos swipe sideways
-          to the next or previous day. */}
+      {/* Everything below the date strip sits on the list color (white in the light look).
+          The day's todos swipe sideways to the next or previous day. */}
       <View style={styles.section}>
         <DayPager
           today={today}
@@ -122,13 +124,16 @@ export default function TodoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
+  // The header's color, from the top of the screen (behind the status bar) down to the date
+  // strip.
   screen: {
     flex: 1,
+    backgroundColor: colors.headerBackground,
   },
   section: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.listBackground,
   },
   // Round icon button; its icon shows which view is on.
   viewButton: {
@@ -141,4 +146,4 @@ const styles = StyleSheet.create({
   viewButtonPressed: {
     backgroundColor: colors.border,
   },
-});
+}));

@@ -55,6 +55,7 @@ type TodosValue = {
   addTodo: (todo: NewTodo) => void;
   updateTodo: (id: string, changes: TodoChanges) => void;
   toggleTodo: (id: string) => void;
+  deleteTodo: (id: string) => void;
 };
 
 const STORAGE_KEY = 'todos';
@@ -135,6 +136,54 @@ export function updateTodos(update: (current: Todo[]) => Todo[]) {
   listeners.forEach((listener) => listener());
 }
 
+/**
+ * Todos deleted on the phone that the account doesn't know about yet: the next sync marks them
+ * deleted there (src/lib/todoSync.ts), so they go from the user's other phones and Google
+ * Calendar too, and won't come back from the account meanwhile. Saved on the phone, so a
+ * deletion made offline still reaches the account later.
+ */
+export type DeletedTodo = { id: string; userId: string };
+
+const DELETED_STORAGE_KEY = 'todos.deleted';
+
+function loadDeleted(): DeletedTodo[] {
+  try {
+    const saved = Storage.getItemSync(DELETED_STORAGE_KEY);
+    const parsed: unknown = saved ? JSON.parse(saved) : [];
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (entry): entry is DeletedTodo =>
+            typeof entry?.id === 'string' && typeof entry?.userId === 'string',
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+let deletedTodos = loadDeleted();
+
+function saveDeleted(next: DeletedTodo[]) {
+  deletedTodos = next;
+  try {
+    Storage.setItemSync(DELETED_STORAGE_KEY, JSON.stringify(next));
+  } catch (error) {
+    console.warn('Could not save deleted todos', error);
+  }
+}
+
+/** Deleted todos still to be marked deleted in the account. */
+export function getDeletedTodos(): readonly DeletedTodo[] {
+  return deletedTodos;
+}
+
+/** Forgets deletions the account now has. */
+export function forgetDeletedTodos(ids: ReadonlySet<string>) {
+  if (deletedTodos.some((entry) => ids.has(entry.id))) {
+    saveDeleted(deletedTodos.filter((entry) => !ids.has(entry.id)));
+  }
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
@@ -159,6 +208,17 @@ function updateTodo(id: string, changes: TodoChanges) {
   updateTodos((current) =>
     current.map((todo) => (todo.id === id ? changed({ ...todo, ...changes }) : todo)),
   );
+}
+
+/**
+ * Deletes a todo: it goes from the phone at once (and its reminder with it). One that's in an
+ * account is noted, so the next sync deletes it there too (getDeletedTodos).
+ */
+function deleteTodo(id: string) {
+  const todo = todos.find((candidate) => candidate.id === id);
+  if (!todo) return;
+  if (todo.userId) saveDeleted([...deletedTodos, { id, userId: todo.userId }]);
+  updateTodos((current) => current.filter((candidate) => candidate.id !== id));
 }
 
 // Marking a todo done notes when, for the Stats tab's On time card; undoing it clears that.
@@ -190,5 +250,8 @@ export function TodosProvider({ children }: { children: ReactNode }) {
 /** The todo list, and the ways to change it. Re-renders when the todos change. */
 export function useTodos(): TodosValue {
   const current = useSyncExternalStore(subscribe, getTodos);
-  return useMemo(() => ({ todos: current, addTodo, updateTodo, toggleTodo }), [current]);
+  return useMemo(
+    () => ({ todos: current, addTodo, updateTodo, toggleTodo, deleteTodo }),
+    [current],
+  );
 }

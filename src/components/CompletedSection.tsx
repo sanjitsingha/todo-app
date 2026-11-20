@@ -1,8 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { Collapsible, ExpandChevron, useExpandable } from '@/components/Collapsible';
 import { TodoItem } from '@/components/TodoItem';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { Todo } from '@/store/todos';
 
 /**
@@ -10,6 +10,8 @@ import type { Todo } from '@/store/todos';
  * or closes the day's finished todos underneath. Starts open.
  */
 export function CompletedSection({ todos }: { todos: Todo[] }) {
+  const styles = useStyles();
+  const colors = useColors();
   const { expanded, toggle, progress } = useExpandable(true);
 
   return (
@@ -37,7 +39,7 @@ export function CompletedSection({ todos }: { todos: Todo[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same insets as the filter dropdown's toolbar, so the two headers line up.
   headerRow: {
     paddingHorizontal: 16,
@@ -67,4 +69,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textMuted,
   },
-});
+}));

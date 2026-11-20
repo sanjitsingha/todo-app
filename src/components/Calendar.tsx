@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { DAY_BOX_RADIUS, DAY_BOX_SIZE } from '@/components/DateStrip';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import {
   WEEKDAYS,
   addMonths,
@@ -26,6 +26,7 @@ type Props = {
 
 /** A month of days with previous / next month buttons. Tapping a day picks it. */
 export function Calendar({ value, today, minDate, onSelect }: Props) {
+  const styles = useStyles();
   // The 1st of the month on screen.
   const [month, setMonth] = useState(() => startOfMonth(value));
   const canGoBack = !minDate || month > startOfMonth(minDate);
@@ -93,6 +94,8 @@ function NavButton({
   disabled?: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -125,6 +128,7 @@ function DayCell({
   disabled: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -157,7 +161,7 @@ const DAY_SIZE = 38;
 /** The date strip's box corners, scaled to this size, so the picked day is the same shape. */
 const DAY_RADIUS = Math.round(DAY_SIZE * (DAY_BOX_RADIUS / DAY_BOX_SIZE));
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -243,4 +247,4 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.accent,
   },
-});
+}));

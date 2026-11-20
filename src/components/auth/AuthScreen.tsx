@@ -1,16 +1,9 @@
 import { useState, type ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BackButton } from '@/components/BackButton';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 type Props = {
   title: string;
@@ -52,6 +45,7 @@ export function AuthScreen({
   top,
   showBack = true,
 }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const back = showBack ? (
     <View style={styles.back}>
@@ -130,10 +124,10 @@ export function AuthScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.page,
   },
   // Grows to the screen's height, so the footer can sit at the bottom.
   content: {
@@ -158,7 +152,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.page,
   },
   // The arrow's icon lines up with the title (the button has its own margin and padding).
   back: {
@@ -193,4 +187,4 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     alignItems: 'center',
   },
-});
+}));

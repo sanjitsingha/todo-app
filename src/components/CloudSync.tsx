@@ -5,6 +5,7 @@ import { syncSettings } from '@/lib/settingsSync';
 import { syncTodos } from '@/lib/todoSync';
 import { useAuth } from '@/store/auth';
 import { syncGoogleCalendar } from '@/store/calendar';
+import { refreshCalendarEvents } from '@/store/calendarEvents';
 import { getSettingsSync, useSettings } from '@/store/settings';
 import { useTodos } from '@/store/todos';
 
@@ -37,6 +38,12 @@ async function runSyncs() {
       } catch (error) {
         console.warn('Could not update Google Calendar; will try again later.', error);
       }
+      // The person's own events, for Today, when Events is on (cleared when it's off).
+      try {
+        await refreshCalendarEvents(userId);
+      } catch (error) {
+        console.warn('Could not load calendar events; will try again later.', error);
+      }
     }
   } finally {
     running = false;
@@ -51,7 +58,8 @@ function requestSync(userId: string) {
 /**
  * Keeps the phone and the signed-in account in step (todos: src/lib/todoSync.ts, settings:
  * src/lib/settingsSync.ts), then has the todos sent on to Google Calendar when that's
- * connected (src/store/calendar.ts). It syncs on signing in (or opening the app signed in), on
+ * connected (src/store/calendar.ts), and loads the person's events when Events is on
+ * (src/store/calendarEvents.ts). It syncs on signing in (or opening the app signed in), on
  * coming back to the app, and shortly after anything changes on the phone. Signed out, it does
  * nothing. Draws nothing.
  */

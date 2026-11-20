@@ -236,10 +236,9 @@ export function formatDueDateTime(key: DateKey, time?: TimeKey, now = new Date()
   return time ? `${day}, ${formatTime(time)}` : day;
 }
 
-/** Where the time picker starts: the next whole hour if `date` is today, otherwise 9:00 am. */
-export function defaultTime(date: DateKey, now = new Date()): TimeKey {
-  if (date !== toDateKey(now)) return '09:00';
-  return toTimeKey(Math.min(now.getHours() + 1, 23), 0);
+/** Where a time picker starts: the current time, to the minute, whatever the day. */
+export function currentTime(now = new Date()): TimeKey {
+  return toTimeKey(now.getHours(), now.getMinutes());
 }
 
 /** "Thursday, 12 November 2026", for screen readers. */

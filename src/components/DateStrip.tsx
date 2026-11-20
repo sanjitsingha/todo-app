@@ -15,7 +15,7 @@ import {
 } from 'react-native-reanimated';
 
 import { DAYS_AFTER, DAYS_BEFORE } from '@/constants/dayRange';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { useSnapStrip } from '@/hooks/useSnapStrip';
 import { addDays, shortWeekday, toDateKey, type DateKey } from '@/lib/dates';
 
@@ -50,6 +50,7 @@ export const DateStrip = memo(function DateStrip({
   onSelectDate,
   follow,
 }: Props) {
+  const styles = useStyles();
   const { width } = useWindowDimensions();
   // Also lets the UI thread scroll the strip, to follow the pager.
   const listRef = useAnimatedRef<FlatList<Date>>();
@@ -123,7 +124,11 @@ export const DateStrip = memo(function DateStrip({
       getItemLayout={getItemLayout}
       initialScrollIndex={initialIndex}
       {...scrollProps}
-      windowSize={7}
+      // A long fling crosses many days a second: days are kept ready five screens either side,
+      // and drawn in bigger batches, so it doesn't outrun them and show gaps.
+      windowSize={11}
+      maxToRenderPerBatch={21}
+      updateCellsBatchingPeriod={30}
       initialNumToRender={15}
     />
   );
@@ -147,6 +152,7 @@ const DayItem = memo(function DayItem({
   isToday,
   onPress,
 }: DayItemProps) {
+  const styles = useStyles();
   // How close this day is to the center: 0 = one day away (or more), 1 = centered.
   // Text weight and color can't run on the native driver, so the plain and picked looks are
   // two copies of the text crossfading.
@@ -173,11 +179,18 @@ const DayItem = memo(function DayItem({
       accessibilityLabel={`${weekday} ${day}${isToday ? ', today' : ''}`}
     >
       <View style={styles.weekdayRow}>
-        <Animated.Text style={[styles.weekday, { opacity: animated.plainOpacity }]}>
+        <Animated.Text
+          style={[styles.weekday, isToday && styles.today, { opacity: animated.plainOpacity }]}
+        >
           {weekday}
         </Animated.Text>
         <Animated.Text
-          style={[styles.weekday, styles.weekdayPicked, { opacity: animated.pickedOpacity }]}
+          style={[
+            styles.weekday,
+            styles.weekdayPicked,
+            isToday && styles.today,
+            { opacity: animated.pickedOpacity },
+          ]}
         >
           {weekday}
         </Animated.Text>
@@ -190,11 +203,18 @@ const DayItem = memo(function DayItem({
             { opacity: animated.boxOpacity, transform: [{ scale: animated.boxScale }] },
           ]}
         />
-        <Animated.Text style={[styles.number, { opacity: animated.plainOpacity }]}>
+        <Animated.Text
+          style={[styles.number, isToday && styles.today, { opacity: animated.plainOpacity }]}
+        >
           {day}
         </Animated.Text>
         <Animated.Text
-          style={[styles.number, styles.numberPicked, { opacity: animated.pickedOpacity }]}
+          style={[
+            styles.number,
+            styles.numberPicked,
+            isToday && styles.today,
+            { opacity: animated.pickedOpacity },
+          ]}
         >
           {day}
         </Animated.Text>
@@ -208,7 +228,7 @@ const DayItem = memo(function DayItem({
 export const DAY_BOX_SIZE = 28;
 export const DAY_BOX_RADIUS = 8;
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   list: {
     // Horizontal lists stretch to fill the column by default; keep it to its content height.
     flexGrow: 0,
@@ -262,4 +282,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-});
+  // Today's weekday and date, in the Dooist orange, picked or not.
+  today: {
+    color: colors.primary,
+  },
+}));

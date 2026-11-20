@@ -1,9 +1,9 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 
 import { formatDuration } from '@/constants/duration';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { DateKey, TimeKey } from '@/lib/dates';
 
 type Props = {
@@ -21,6 +21,8 @@ type Props = {
  * hours and minutes strips, which sends the pick back as the add sheet's `duration` param.
  */
 export function DurationField({ value, dueDate, dueTime, reminderTime }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const label = value ? formatDuration(value) : 'Add duration';
 
@@ -59,7 +61,7 @@ export function DurationField({ value, dueDate, dueTime, reminderTime }: Props) 
 }
 
 // The same as the Reminder row below it.
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     minHeight: 52,
     flexDirection: 'row',
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.textMuted,
   },
-});
+}));

@@ -4,30 +4,18 @@ import { useUpdates } from 'expo-updates';
 import Bot from 'lucide-react-native/icons/bot';
 import CalendarSync from 'lucide-react-native/icons/calendar-sync';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import CircleUserRound from 'lucide-react-native/icons/circle-user-round';
 import LogOut from 'lucide-react-native/icons/log-out';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import SunMoon from 'lucide-react-native/icons/sun-moon';
 import Vibrate from 'lucide-react-native/icons/vibrate';
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-} from 'react-native';
+import { useEffect, type ComponentType, type ReactNode } from 'react';
+import { Alert, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { logOut, useAuth } from '@/store/auth';
-import {
-  connectGoogleCalendar,
-  disconnectGoogleCalendar,
-  refreshCalendar,
-  useCalendar,
-} from '@/store/calendar';
+import { refreshCalendar, useCalendar } from '@/store/calendar';
 
 const ICON_SIZE = 22;
 
@@ -45,6 +33,8 @@ type RowProps = {
 
 /** A row of the list: Lucide icon, title, and a chevron (or `accessory`) at the right. */
 function Row({ icon: Icon, title, destructive = false, accessory, onPress }: RowProps) {
+  const styles = useStyles();
+  const colors = useColors();
   const tint = destructive ? colors.danger : colors.ink;
   return (
     <Pressable
@@ -88,17 +78,15 @@ function confirmLogOut() {
 }
 
 /**
- * Google Calendar: "Connect Google Calendar" opens Google's page to allow it; once connected,
- * the todos go, one way, to a "Dooist" calendar in that Google account (src/store/calendar.ts).
- * Connected, it says so, and a tap offers to disconnect. If it stopped by itself (the access was
- * removed in Google, or the calendar deleted), it offers to reconnect.
+ * Calendar: opens the Calendar page (src/app/calendar.tsx), where Google Calendar is connected,
+ * its events shown in Dooist, and todo sync switched on or off. Says Connected while it is.
  */
 function CalendarRow({ userId }: { userId: string }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const router = useRouter();
   const calendar = useCalendar();
-  const [busy, setBusy] = useState(false);
-  const mine = calendar.userId === userId;
-  const connected = mine && calendar.connected;
-  const problem = mine ? calendar.problem : undefined;
+  const connected = calendar.userId === userId && calendar.connected;
 
   // The latest from the account each time Profile opens (it may have changed elsewhere).
   useEffect(() => {
@@ -107,57 +95,34 @@ function CalendarRow({ userId }: { userId: string }) {
     });
   }, [userId]);
 
-  const connect = async () => {
-    setBusy(true);
-    const failure = await connectGoogleCalendar(userId);
-    setBusy(false);
-    if (failure) Alert.alert('Couldn’t connect Google Calendar', failure);
-  };
-
-  const disconnect = async () => {
-    setBusy(true);
-    const failure = await disconnectGoogleCalendar(userId);
-    setBusy(false);
-    if (failure) Alert.alert('Couldn’t disconnect Google Calendar', failure);
-  };
-
-  const onPress = () => {
-    if (busy) return;
-    if (!connected) {
-      void connect();
-      return;
-    }
-    const where = calendar.email ? ` in ${calendar.email}` : '';
-    Alert.alert(
-      'Google Calendar',
-      `Your todos go to the Dooist calendar${where}. Disconnecting stops that; the calendar and its events stay in Google Calendar.`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        { text: 'Disconnect', style: 'destructive', onPress: () => void disconnect() },
-      ],
-    );
-  };
-
-  let title = 'Connect Google Calendar';
-  if (connected) title = 'Google Calendar';
-  else if (problem) title = 'Reconnect Google Calendar';
-
-  let accessory: ReactNode;
-  if (busy) accessory = <ActivityIndicator color={colors.ink} />;
-  else if (connected) accessory = <Text style={styles.status}>Connected</Text>;
-
-  return <Row icon={CalendarSync} title={title} accessory={accessory} onPress={onPress} />;
+  return (
+    <Row
+      icon={CalendarSync}
+      title="Calendar"
+      accessory={
+        connected ? (
+          <View style={styles.accessory}>
+            <Text style={styles.status}>Connected</Text>
+            <ChevronRight size={18} color={colors.iconInactive} />
+          </View>
+        ) : undefined
+      }
+      onPress={() => router.push('/calendar')}
+    />
+  );
 }
 
 /**
- * The Profile tab: the app's settings and accounts, top to bottom: Haptic Feedback, Appearance,
- * Check for Updates, Google Calendar, Connect ChatGPT, Privacy Policy, then Log Out (signing in
- * is required, so someone always is). The settings open bottom sheets: Haptic Feedback,
- * Appearance and Check for Updates (src/app/haptic-feedback.tsx, src/app/appearance.tsx,
- * src/app/updates.tsx); Google Calendar connects in the in-app browser; the rest are in place for
- * what comes next.
+ * The Profile tab: the app's settings and accounts, top to bottom: Account, Haptic Feedback,
+ * Appearance, Check for Updates, Calendar, Connect ChatGPT, Privacy Policy, then Log Out
+ * (signing in is required, so someone always is). Account and Check for Updates open pages of
+ * their own (src/app/account.tsx, src/app/updates.tsx); Haptic Feedback and Appearance open
+ * bottom sheets (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Calendar opens its page
+ * (src/app/calendar.tsx); the rest are in place for what comes next. The bell in the header opens
+ * Notifications.
  */
 export default function ProfileScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const { user } = useAuth();
   // The app checks for updates each time it opens and downloads one in the background; once it's
@@ -166,6 +131,7 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
+      <Row icon={CircleUserRound} title="Account" onPress={() => router.push('/account')} />
       <Row
         icon={Vibrate}
         title="Haptic Feedback"
@@ -187,7 +153,7 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   content: {
     paddingVertical: 8,
   },
@@ -210,4 +176,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
   },
-});
+  // A status with the chevron after it.
+  accessory: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+}));

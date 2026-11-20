@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Calendar } from '@/components/Calendar';
-import { DUE_DATE_COLORS } from '@/constants/dueDate';
-import { colors } from '@/constants/theme';
+import { dueDateColors } from '@/constants/dueDate';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { addDays, formatLongDate, formatShortDate, toDateKey, type DateKey } from '@/lib/dates';
 
 type IconName = 'today-outline' | 'sunny-outline';
@@ -18,15 +18,17 @@ type Props = {
 
 /** Quick choices (Today, Tomorrow) above a month calendar. */
 export function DueDatePicker({ value, today, onSelect }: Props) {
+  const styles = useStyles();
+  const choiceColors = dueDateColors(useColors());
   const todayKey = toDateKey(today);
 
   // Icon colors are shared with the date chips on todos.
   const quickChoices: { label: string; icon: IconName; color: string; date: DateKey }[] = [
-    { label: 'Today', icon: 'today-outline', color: DUE_DATE_COLORS.today.icon, date: todayKey },
+    { label: 'Today', icon: 'today-outline', color: choiceColors.today.icon, date: todayKey },
     {
       label: 'Tomorrow',
       icon: 'sunny-outline',
-      color: DUE_DATE_COLORS.tomorrow.icon,
+      color: choiceColors.tomorrow.icon,
       date: toDateKey(addDays(today, 1)),
     },
   ];
@@ -54,7 +56,7 @@ export function DueDatePicker({ value, today, onSelect }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   choice: {
     minHeight: 48,
     flexDirection: 'row',
@@ -82,4 +84,4 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     backgroundColor: colors.border,
   },
-});
+}));

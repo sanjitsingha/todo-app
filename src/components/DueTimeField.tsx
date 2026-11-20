@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { TimePicker } from '@/components/TimePicker';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { formatTime, type TimeKey } from '@/lib/dates';
 
 type Props = {
@@ -18,6 +18,8 @@ type Props = {
  * button; with one it shows the time, a button to remove it, and the time picker.
  */
 export function DueTimeField({ value, onAdd, onChange, onRemove }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   if (value === null) {
     return (
       <Pressable
@@ -53,7 +55,7 @@ export function DueTimeField({ value, onAdd, onChange, onRemove }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same as the quick date choices above it.
   row: {
     minHeight: 48,
@@ -77,4 +79,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.ink,
   },
-});
+}));

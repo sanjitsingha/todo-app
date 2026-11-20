@@ -1,6 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { useEffect, useMemo } from 'react';
-import { Platform, StyleSheet, Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -11,7 +11,8 @@ import Animated, {
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import type { ChartRange } from '@/components/TodosWrittenChart';
-import { colors } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useNow } from '@/hooks/useNow';
 import { addDays, deadlineOf, toDateKey, type DateKey } from '@/lib/dates';
 import { useTodos } from '@/store/todos';
@@ -24,14 +25,14 @@ type Counts = Record<Outcome, number>;
 const OUTCOMES: readonly {
   key: Outcome;
   label: string;
-  /** Its part of the ring, and the dot by its name. */
-  ring: string;
+  /** Its part of the ring, and the dot by its name: a theme color's name. */
+  ring: keyof ThemeColors;
   /** Its count: a deeper shade where the ring color is too light for text. */
-  text: string;
+  text: keyof ThemeColors;
 }[] = [
-  { key: 'onTime', label: 'On time', ring: colors.success, text: colors.successDark },
-  { key: 'late', label: 'Late', ring: colors.accent, text: colors.accentDark },
-  { key: 'overdue', label: 'Overdue', ring: colors.danger, text: colors.danger },
+  { key: 'onTime', label: 'On time', ring: 'success', text: 'successDark' },
+  { key: 'late', label: 'Late', ring: 'accent', text: 'accentDark' },
+  { key: 'overdue', label: 'Overdue', ring: 'danger', text: 'danger' },
 ];
 
 /** Days each range covers, ending today. */
@@ -120,14 +121,15 @@ type Arc = { key: Outcome; from: number; to: number; color: string };
 /**
  * The ring's parts, clockwise from the top: one for each outcome with any todos, sized by its
  * share. One outcome alone is the whole ring. Otherwise there's a gap between parts, and a
- * very small part is made big enough to show, taking the room from the bigger ones.
+ * very small part is made big enough to show, taking the room from the bigger ones. Colored
+ * from `colors`.
  */
-function ringArcs(counts: Counts): Arc[] {
+function ringArcs(counts: Counts, colors: ThemeColors): Arc[] {
   const total = totalOf(counts);
   const present = OUTCOMES.filter((outcome) => counts[outcome.key] > 0);
   if (present.length === 0) return [];
   if (present.length === 1) {
-    return [{ key: present[0].key, from: 0, to: 360, color: present[0].ring }];
+    return [{ key: present[0].key, from: 0, to: 360, color: colors[present[0].ring] }];
   }
 
   const shares = present.map((outcome) => (counts[outcome.key] / total) * 360);
@@ -144,7 +146,12 @@ function ringArcs(counts: Counts): Arc[] {
     // Half the part's length once its share of the gaps is taken off (at least nothing: a dot).
     const half = Math.max(0, (sweep - GAP_DEGREES) / 2);
     start += sweep;
-    return { key: outcome.key, from: middle - half, to: middle + half, color: outcome.ring };
+    return {
+      key: outcome.key,
+      from: middle - half,
+      to: middle + half,
+      color: colors[outcome.ring],
+    };
   });
 }
 
@@ -204,10 +211,12 @@ function RingArc({ from, to, color, sweep }: Omit<Arc, 'key'> & { sweep: SharedV
  * and when you switch range.
  */
 export function OnTimeSummary({ range }: { range: ChartRange }) {
+  const colors = useColors();
+  const styles = useStyles();
   const counts = useOutcomes(range);
   const total = totalOf(counts);
   const percent = onTimePercent(counts);
-  const arcs = useMemo(() => ringArcs(counts), [counts]);
+  const arcs = useMemo(() => ringArcs(counts, colors), [counts, colors]);
 
   const sweep = useSharedValue(0);
   const focused = useIsFocused();
@@ -258,13 +267,13 @@ export function OnTimeSummary({ range }: { range: ChartRange }) {
             return (
               <View key={outcome.key}>
                 <View style={styles.legendName}>
-                  <View style={[styles.dot, { backgroundColor: outcome.ring }]} />
+                  <View style={[styles.dot, { backgroundColor: colors[outcome.ring] }]} />
                   <Text style={styles.legendLabel}>{outcome.label}</Text>
                 </View>
                 <Text
                   style={[
                     styles.legendCount,
-                    { color: count > 0 ? outcome.text : colors.textSubtle },
+                    { color: count > 0 ? colors[outcome.text] : colors.textSubtle },
                   ]}
                 >
                   {count}
@@ -281,7 +290,7 @@ export function OnTimeSummary({ range }: { range: ChartRange }) {
 const DOT_SIZE = 8;
 const DOT_GAP = 6;
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,4 +356,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-});
+}));

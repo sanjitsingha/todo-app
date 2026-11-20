@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { PickerStrip } from '@/components/PickerStrip';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { fromDayMinutes, MINUTES_PER_DAY, parseTimeKey, type TimeKey } from '@/lib/dates';
 
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1));
@@ -26,6 +26,7 @@ function dayMinutes(hour12: number, minutes: number, isPm: boolean): number {
 
 /** Swipeable hour (1 to 12) and minute (00 to 59) strips, and an am / pm switch. */
 export function TimePicker({ value, onChange, earliest = 0 }: Props) {
+  const styles = useStyles();
   const { hours, minutes } = parseTimeKey(value);
   const isPm = hours >= 12;
   const hour12 = hours % 12 || 12;
@@ -92,7 +93,7 @@ export function TimePicker({ value, onChange, earliest = 0 }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same look as the calendar's weekday labels.
   caption: {
     paddingHorizontal: 8,
@@ -133,4 +134,4 @@ const styles = StyleSheet.create({
   periodTextSelected: {
     color: colors.onPrimary,
   },
-});
+}));

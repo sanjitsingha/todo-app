@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { DUE_DATE_COLORS } from '@/constants/dueDate';
-import { PRIORITIES } from '@/constants/priority';
-import { colors } from '@/constants/theme';
+import { dueDateColors } from '@/constants/dueDate';
+import { priorityLevels } from '@/constants/priority';
+import type { ThemeColors } from '@/constants/theme';
+import { useColors } from '@/hooks/useTheme';
 import { formatDueDateTime, formatTime, getDueDateKind, isOverdue } from '@/lib/dates';
 import type { Todo } from '@/store/todos';
 
@@ -21,9 +22,10 @@ export function dueLabel(todo: Todo): string {
   return !todo.completed && isOverdue(todo.dueDate) ? `Overdue · ${label}` : label;
 }
 
-/** The todo's priority level, with its label and colors. */
-export function priorityOf(todo: Todo) {
-  return PRIORITIES.find((level) => level.value === todo.priority) ?? PRIORITIES[1];
+/** The todo's priority level, with its label and colors in `colors` (useColors). */
+export function priorityOf(todo: Todo, colors: ThemeColors) {
+  const levels = priorityLevels(colors);
+  return levels.find((level) => level.value === todo.priority) ?? levels[1];
 }
 
 /**
@@ -32,9 +34,10 @@ export function priorityOf(todo: Todo) {
  * date as plain gray text, and overdue ones in red.
  */
 export function DueDateChip({ todo, size = 'small' }: ChipProps) {
+  const colors = useColors();
   const overdue = !todo.completed && isOverdue(todo.dueDate);
   const kind = todo.completed ? null : getDueDateKind(todo.dueDate);
-  const chip = kind ? DUE_DATE_COLORS[kind] : null;
+  const chip = kind ? dueDateColors(colors)[kind] : null;
   const color = overdue ? colors.danger : chip ? chip.text : colors.textMuted;
   const sizes = SIZES[size];
 
@@ -53,6 +56,7 @@ export function DueDateChip({ todo, size = 'small' }: ChipProps) {
 
 /** The todo's reminder time as plain gray text, or nothing if it has no reminder. */
 export function ReminderChip({ todo, size = 'small' }: ChipProps) {
+  const colors = useColors();
   if (!todo.reminderTime) return null;
   const color = todo.completed ? colors.textSubtle : colors.textMuted;
   const sizes = SIZES[size];

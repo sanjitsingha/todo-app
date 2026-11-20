@@ -1,4 +1,6 @@
 import {
+  FunctionsFetchError,
+  FunctionsHttpError,
   isAuthError,
   isAuthRetryableFetchError,
   isAuthSessionMissingError,
@@ -17,14 +19,19 @@ import {
 } from 'react';
 
 import { AUTH_CALLBACK_PATH } from '@/constants/links';
-import { appLink } from '@/lib/appLink';
+import { appLink, BROWSER_RETURN_OPTIONS } from '@/lib/appLink';
 import { supabase } from '@/lib/supabase';
+import { updateTodos } from '@/store/todos';
 
 /** Someone signed in to the app. */
 export type AuthUser = {
   id: string;
   email: string;
   name?: string;
+  /** Their picture: the Google account's, for Google sign-ins. */
+  avatarUrl?: string;
+  /** How they can sign in: 'email' (a password), 'google', or both. */
+  providers: readonly string[];
 };
 
 type AuthContextValue = {
@@ -61,15 +68,43 @@ function subscribeToReset(listener: () => void) {
 
 const getResettingPassword = () => resettingPassword;
 
+/** A non-empty, trimmed string from user metadata, or undefined. */
+function text(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
 function toAuthUser(user: User | null | undefined): AuthUser | null {
   if (!user) return null;
-  // `name` is set by sign up; Google accounts bring `name` and `full_name`.
-  const name = user.user_metadata?.name ?? user.user_metadata?.full_name;
+  const meta = user.user_metadata ?? {};
+  // `display_name` is the name changed in Account (updateDisplayName). It has its own key
+  // because Supabase writes Google's `name` and `full_name` over again at every Google sign-in.
+  // `name` is also set by sign up.
+  const name = text(meta.display_name) ?? text(meta.name) ?? text(meta.full_name);
+  const avatarUrl = text(meta.avatar_url) ?? text(meta.picture);
+  const providers = Array.isArray(user.app_metadata?.providers)
+    ? user.app_metadata.providers.filter((provider): provider is string => typeof provider === 'string')
+    : typeof user.app_metadata?.provider === 'string'
+      ? [user.app_metadata.provider]
+      : [];
   return {
     id: user.id,
     email: user.email ?? '',
-    name: typeof name === 'string' && name.trim() ? name.trim() : undefined,
+    name,
+    avatarUrl: avatarUrl?.startsWith('https://') ? avatarUrl : undefined,
+    providers,
   };
+}
+
+/** Whether two users would look the same in the app, so a token refresh changes nothing. */
+function sameUser(a: AuthUser | null, b: AuthUser | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.id === b.id &&
+    a.email === b.email &&
+    a.name === b.name &&
+    a.avatarUrl === b.avatarUrl &&
+    a.providers.join() === b.providers.join()
+  );
 }
 
 /**
@@ -86,19 +121,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!supabase) return;
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!active) return;
-      setUser(toAuthUser(data.session?.user));
-      setReady(true);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!active) return;
+        setUser(toAuthUser(data.session?.user));
+        setReady(true);
+      })
+      .catch((error) => {
+        // Couldn't read the saved sign-in: go on signed out (Log in) rather than waiting.
+        console.warn('Could not read the saved sign-in', error);
+        if (active) setReady(true);
+      });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const next = toAuthUser(session?.user);
       // Token refreshes report the same person; keep the same object so nothing re-syncs.
-      setUser((current) =>
-        current?.id === next?.id && current?.email === next?.email && current?.name === next?.name
-          ? current
-          : next,
-      );
+      setUser((current) => (sameUser(current, next) ? current : next));
     });
     return () => {
       active = false;
@@ -262,7 +300,11 @@ export async function signInWithGoogle(): Promise<AuthError> {
     });
     if (error) return describe(error);
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    const result = await WebBrowser.openAuthSessionAsync(
+      data.url,
+      redirectTo,
+      BROWSER_RETURN_OPTIONS,
+    );
     if (result.type !== 'success') return null;
 
     const { queryParams } = Linking.parse(result.url);
@@ -275,6 +317,74 @@ export async function signInWithGoogle(): Promise<AuthError> {
     }
     const exchanged = await supabase.auth.exchangeCodeForSession(code);
     return exchanged.error ? describe(exchanged.error) : null;
+  } catch (error) {
+    return describe(error);
+  }
+}
+
+/**
+ * Changes the signed-in person's name (Account). Saved in the account, under `display_name`
+ * (see toAuthUser), so every phone signed in to it shows the new name.
+ */
+export async function updateDisplayName(name: string): Promise<AuthError> {
+  if (!supabase) return NOT_SET_UP;
+  try {
+    const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+    if (isAuthSessionMissingError(error)) return SIGNED_OUT;
+    return error ? describe(error) : null;
+  } catch (error) {
+    return describe(error);
+  }
+}
+
+const SIGNED_OUT = 'You’ve been signed out. Log in again and try once more.';
+
+/**
+ * Sets a password on the signed-in account (Account). For someone who signed up with Google,
+ * that's a second way in: they can log in with their email and this password, and Google keeps
+ * working too.
+ */
+export async function changePassword(password: string): Promise<AuthError> {
+  if (!supabase) return NOT_SET_UP;
+  try {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) return null;
+    if (isAuthSessionMissingError(error)) return SIGNED_OUT;
+    // The project's "Secure password change" wants a recent sign-in first.
+    if (isAuthError(error) && error.code === 'reauthentication_needed') {
+      return 'For your security, log out and log back in, then try again.';
+    }
+    return describe(error);
+  } catch (error) {
+    return describe(error);
+  }
+}
+
+/**
+ * Deletes the signed-in account for good, through the delete-account Edge Function
+ * (supabase/functions/delete-account): the account goes, and with it its todos, settings and
+ * Google Calendar connection. Then this phone forgets the account's todos and signs out, back
+ * to Log in.
+ */
+export async function deleteAccount(userId: string): Promise<AuthError> {
+  if (!supabase) return NOT_SET_UP;
+  try {
+    const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+    if (error) {
+      if (error instanceof FunctionsFetchError) {
+        return 'Couldn’t reach the server. Check your internet connection and try again.';
+      }
+      if (error instanceof FunctionsHttpError && error.context.status === 404) {
+        return 'Deleting accounts isn’t set up yet.';
+      }
+      if (error instanceof FunctionsHttpError && error.context.status === 401) return SIGNED_OUT;
+      return 'Couldn’t delete your account. Please try again.';
+    }
+    updateTodos((current) => current.filter((todo) => todo.userId !== userId));
+    setResettingPassword(false);
+    // The account is gone, so only this phone's copy of the sign-in is left to clear.
+    await supabase.auth.signOut({ scope: 'local' });
+    return null;
   } catch (error) {
     return describe(error);
   }

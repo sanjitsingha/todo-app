@@ -1,10 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, type ComponentType } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 /** After a pick, the sheet stays this long, so the radio is seen moving, then closes. */
 const CLOSE_DELAY_MS = 250;
@@ -30,6 +30,7 @@ type Props<T extends string> = {
 
 /** A round radio button: an empty ring, or a ring with a dot in it when picked. */
 function Radio({ selected }: { selected: boolean }) {
+  const styles = useStyles();
   return (
     <View style={[styles.radio, selected && styles.radioSelected]}>
       {selected ? <View style={styles.radioDot} /> : null}
@@ -45,6 +46,8 @@ function Radio({ selected }: { selected: boolean }) {
  * content (`sheetAllowedDetents: 'fitToContents'` in src/app/_layout.tsx).
  */
 export function ChoiceSheet<T extends string>({ title, options, value, onPick }: Props<T>) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -101,7 +104,7 @@ export function ChoiceSheet<T extends string>({ title, options, value, onPick }:
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     backgroundColor: colors.surface,
     paddingTop: Platform.OS === 'android' ? 10 : 24,
@@ -148,4 +151,4 @@ const styles = StyleSheet.create({
     borderRadius: RADIO_DOT_SIZE / 2,
     backgroundColor: colors.ink,
   },
-});
+}));

@@ -1,8 +1,8 @@
-import { colors } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
 import type { Priority } from '@/store/todos';
 
-/** The priority levels, highest first, with how each one looks. */
-export const PRIORITIES: readonly {
+/** A priority level and how it looks. */
+export type PriorityLevel = {
   value: Priority;
   label: string;
   /** Text and icon color. */
@@ -11,26 +11,38 @@ export const PRIORITIES: readonly {
   background: string;
   /** A deep shade of `background`, for text on it, like a todo's title on the timeline. */
   deep: string;
-}[] = [
-  {
-    value: 'high',
-    label: 'High',
-    color: colors.danger,
-    background: colors.dangerSoft,
-    deep: colors.dangerDeep,
-  },
-  {
-    value: 'medium',
-    label: 'Medium',
-    color: colors.amberDark,
-    background: colors.amberSoft,
-    deep: colors.amberDeep,
-  },
-  {
-    value: 'low',
-    label: 'Low',
-    color: colors.skyDark,
-    background: colors.skySoft,
-    deep: colors.skyDeep,
-  },
-];
+};
+
+const made = new WeakMap<ThemeColors, readonly PriorityLevel[]>();
+
+/** The priority levels, highest first, in a look's colors (src/hooks/useTheme.ts, useColors). */
+export function priorityLevels(colors: ThemeColors): readonly PriorityLevel[] {
+  let levels = made.get(colors);
+  if (!levels) {
+    levels = [
+      {
+        value: 'high',
+        label: 'High',
+        color: colors.danger,
+        background: colors.dangerSoft,
+        deep: colors.dangerDeep,
+      },
+      {
+        value: 'medium',
+        label: 'Medium',
+        color: colors.amberDark,
+        background: colors.amberSoft,
+        deep: colors.amberDeep,
+      },
+      {
+        value: 'low',
+        label: 'Low',
+        color: colors.skyDark,
+        background: colors.skySoft,
+        deep: colors.skyDeep,
+      },
+    ];
+    made.set(colors, levels);
+  }
+  return levels;
+}

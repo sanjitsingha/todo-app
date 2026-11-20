@@ -14,8 +14,8 @@ const OPTIONS: readonly Choice<Appearance>[] = [
 
 /**
  * Sheet for the app's look: Light, Dark, or following the phone (System). Opened from Profile.
- * Picking one saves it and closes the sheet. For now it's only saved: the app is always light
- * until a dark theme is built.
+ * Picking one saves it and closes the sheet, and the whole app changes over at once
+ * (src/hooks/useTheme.ts, and ThemeSync in src/app/_layout.tsx).
  */
 export default function AppearanceScreen() {
   const { appearance } = useSettings();

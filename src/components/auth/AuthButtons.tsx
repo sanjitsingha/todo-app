@@ -3,7 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FEATURES } from '@/constants/features';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { signInWithGoogle } from '@/store/auth';
 
 /**
@@ -21,6 +21,8 @@ export function PrimaryButton({
   disabled?: boolean;
   loading?: boolean;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -46,6 +48,7 @@ export function PrimaryButton({
 
 /** What went wrong (a wrong password, no internet), in red above the main button. */
 export function ErrorMessage({ message }: { message: string | null }) {
+  const styles = useStyles();
   if (!message) return null;
   return (
     <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
@@ -64,6 +67,8 @@ const GOOGLE_NOT_READY = 'Google sign-in isn’t ready yet. Use your email for n
  * open, a spinner shows instead of the label.
  */
 export function GoogleButton({ onError }: { onError: (message: string | null) => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   const [busy, setBusy] = useState(false);
 
   const continueWithGoogle = async () => {
@@ -102,6 +107,7 @@ export function GoogleButton({ onError }: { onError: (message: string | null) =>
 
 /** A thin line with "or" in the middle, between the email form and the Google button. */
 export function OrDivider() {
+  const styles = useStyles();
   return (
     <View style={styles.divider} accessible={false} importantForAccessibility="no-hide-descendants">
       <View style={styles.dividerLine} />
@@ -113,6 +119,7 @@ export function OrDivider() {
 
 /** Small bold text that acts as a link, e.g. "Forgot password?". */
 export function TextLink({ children, onPress }: { children: ReactNode; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Text onPress={onPress} suppressHighlighting style={styles.link} accessibilityRole="link">
       {children}
@@ -130,6 +137,7 @@ export function FooterPrompt({
   action: string;
   onPress: () => void;
 }) {
+  const styles = useStyles();
   return (
     <Text style={styles.prompt}>
       {prompt} <TextLink onPress={onPress}>{action}</TextLink>
@@ -137,7 +145,7 @@ export function FooterPrompt({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   button: {
     height: 52,
     borderRadius: 12,
@@ -202,4 +210,4 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: colors.danger,
   },
-});
+}));

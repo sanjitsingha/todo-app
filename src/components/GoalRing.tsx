@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { colors } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 /** Diameter and line width of the ring, in points. */
 const SIZE = 32;
@@ -10,9 +11,6 @@ const STROKE = 3;
 const CHUNK_GAP = 2;
 /** With more todos than this the chunks get too small to tell apart, so it's one smooth ring. */
 const MAX_CHUNKS = 10;
-/** The fill color goes red, orange, yellow, then green as more of the day is done. */
-const PROGRESS_STOPS: readonly string[] = [colors.danger, colors.accent, colors.sun, colors.success];
-
 const CENTER = SIZE / 2;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -33,11 +31,15 @@ function mixColors(from: string, to: string, amount: number): string {
   return `#${channels.map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 }
 
-/** The fill color for `share` of the day done, 0 to 1: red at the start, green when all done. */
-function progressColor(share: number): string {
-  const position = Math.min(Math.max(share, 0), 1) * (PROGRESS_STOPS.length - 1);
-  const stop = Math.min(Math.floor(position), PROGRESS_STOPS.length - 2);
-  return mixColors(PROGRESS_STOPS[stop], PROGRESS_STOPS[stop + 1], position - stop);
+/**
+ * The fill color for `share` of the day done, 0 to 1, in `colors`: red at the start, then
+ * orange and yellow, and green when all done.
+ */
+function progressColor(share: number, colors: ThemeColors): string {
+  const stops = [colors.danger, colors.accent, colors.sun, colors.success];
+  const position = Math.min(Math.max(share, 0), 1) * (stops.length - 1);
+  const stop = Math.min(Math.floor(position), stops.length - 2);
+  return mixColors(stops[stop], stops[stop + 1], position - stop);
 }
 
 /** A point on the ring, `degrees` clockwise from the top. */
@@ -67,7 +69,9 @@ type Props = {
  * green when everything is. Past ten todos it's one smooth ring that fills the same way.
  */
 export function GoalRing({ total, done }: Props) {
-  const color = progressColor(total === 0 ? 0 : done / total);
+  const colors = useColors();
+  const styles = useStyles();
+  const color = progressColor(total === 0 ? 0 : done / total, colors);
   const chunked = total >= 2 && total <= MAX_CHUNKS;
   const allDone = total > 0 && done >= total;
   const step = 360 / total;
@@ -121,7 +125,7 @@ export function GoalRing({ total, done }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     width: SIZE,
     height: SIZE,
@@ -140,4 +144,4 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text,
   },
-});
+}));

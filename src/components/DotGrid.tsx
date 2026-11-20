@@ -1,7 +1,7 @@
 import { StyleSheet } from 'react-native';
 import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
 
-import { colors } from '@/constants/theme';
+import { useColors } from '@/hooks/useTheme';
 
 /** Distance between dots, across and down, in points. */
 const SPACING = 22;
@@ -12,6 +12,7 @@ const DOT_RADIUS = 1.3;
  * Drawn once as a repeating pattern, so it costs the same however big the wall is.
  */
 export function DotGrid() {
+  const colors = useColors();
   return (
     <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>

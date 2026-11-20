@@ -1,15 +1,7 @@
 import { useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
 import type { NativeStackNavigationProp } from 'expo-router/native-stack';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputInstance,
-} from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, type TextInputInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DueDateField } from '@/components/DueDateField';
@@ -17,7 +9,7 @@ import { DurationField } from '@/components/DurationField';
 import { PriorityField } from '@/components/PriorityField';
 import { ReminderField } from '@/components/ReminderField';
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { parseDurationParam } from '@/lib/addSheetParams';
 import { isDateKey, isTimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
@@ -30,6 +22,8 @@ import { useTodos, type Priority } from '@/store/todos';
  * way).
  */
 export default function AddTodoScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { addTodo } = useTodos();
@@ -181,7 +175,7 @@ export default function AddTodoScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Fills the sheet, so it's white all the way down when dragged to full screen.
   container: {
     flex: 1,
@@ -234,4 +228,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onPrimary,
   },
-});
+}));

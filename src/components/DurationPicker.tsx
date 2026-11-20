@@ -1,7 +1,7 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { PickerStrip } from '@/components/PickerStrip';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => String(i));
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0'));
@@ -17,6 +17,7 @@ type Props = {
  * same strips as the reminder's time picker (src/components/TimePicker.tsx).
  */
 export function DurationPicker({ value, onChange }: Props) {
+  const styles = useStyles();
   const hours = Math.floor(value / 60);
   const minutes = value % 60;
 
@@ -41,7 +42,7 @@ export function DurationPicker({ value, onChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same as the time picker's captions.
   caption: {
     paddingHorizontal: 8,
@@ -52,4 +53,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     color: colors.textMuted,
   },
-});
+}));

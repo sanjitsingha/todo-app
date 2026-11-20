@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { formatTime, type DateKey, type TimeKey } from '@/lib/dates';
 import { isReminderPast } from '@/lib/reminders';
 
@@ -21,6 +21,8 @@ type Props = {
  * back as the add sheet's `reminderTime` param. A time that has already passed shows in red.
  */
 export function ReminderField({ dueDate, dueTime, value, duration }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const isPast = value !== undefined && isReminderPast(dueDate, value);
   const label = value ? formatTime(value) : 'Add time';
@@ -69,7 +71,7 @@ export function ReminderField({ dueDate, dueTime, value, duration }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Same as the Due date row.
   row: {
     minHeight: 52,
@@ -104,4 +106,4 @@ const styles = StyleSheet.create({
   valueTextPast: {
     color: colors.danger,
   },
-});
+}));

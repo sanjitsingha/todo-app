@@ -1,46 +1,72 @@
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
-// Just these icons, not the whole icon set.
-import CircleAlert from 'lucide-react-native/icons/circle-alert';
-import CircleArrowDown from 'lucide-react-native/icons/circle-arrow-down';
-import CircleCheck from 'lucide-react-native/icons/circle-check';
-import Info from 'lucide-react-native/icons/info';
-import { useEffect, useState, type ComponentType } from 'react';
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SheetGrabber } from '@/components/SheetGrabber';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { formatDueDateTime, toDateKey, toTimeKey } from '@/lib/dates';
 
-const ICON_SIZE = 22;
+/**
+ * A version's name and what's new in it, from `expo.extra.release` in app.json. Every update
+ * and build carries the app config it was made with, so an update's notes can be read before
+ * it's downloaded. Before each update or build, set the new `version` (1.1.1, 1.1.2…) and
+ * `notes` there. It's separate from `expo.version`, which picks the installs an update can go
+ * to (app.json's runtimeVersion follows it), so that one changes only with a new build.
+ */
+type Release = { version?: string; notes: string[] };
 
-type LucideIcon = ComponentType<{ size?: number; color?: string }>;
+/** The release info in an app config (or an update's copy of one). */
+function releaseIn(config: unknown): Release {
+  const app = (config ?? {}) as { version?: unknown; extra?: { release?: unknown } };
+  const release = (app.extra?.release ?? {}) as { version?: unknown; notes?: unknown };
+  const version =
+    typeof release.version === 'string'
+      ? release.version
+      : typeof app.version === 'string'
+        ? app.version
+        : undefined;
+  const notes = Array.isArray(release.notes)
+    ? release.notes.filter((note): note is string => typeof note === 'string' && note.trim() !== '')
+    : [];
+  return { version, notes };
+}
+
+/** An update's release info, from the app config inside its manifest. */
+function releaseOfManifest(manifest: unknown): Release {
+  const extra = (manifest as { extra?: { expoClient?: unknown } } | undefined)?.extra;
+  return releaseIn(extra?.expoClient);
+}
+
+/** An update, as this page talks about it. */
+type Found = { release: Release; publishedAt?: Date };
 
 /**
- * What this sheet last found out. A downloaded update waiting for a restart (from the check when
+ * What this page last found out. A downloaded update waiting for a restart (from the check when
  * the app opened, or from here) comes from useUpdates() instead, and wins over all of these.
  */
 type Status =
   | { kind: 'checking' }
   | { kind: 'upToDate' }
-  | { kind: 'available'; publishedAt?: Date }
-  | { kind: 'downloading' }
   | { kind: 'checkFailed' }
-  | { kind: 'downloadFailed' };
+  | ({ kind: 'available' } & Found)
+  | ({ kind: 'downloading' } & Found)
+  | ({ kind: 'downloadFailed' } & Found);
 
-/** Asks the update server whether there's anything new, as what the sheet should say. */
+/** Asks the update server whether there's anything new, as what the page should say. */
 async function askServer(): Promise<Status> {
   try {
     const result = await Updates.checkForUpdateAsync();
     if (result.isAvailable) {
-      // Updates from EAS Update say when they were published; an embedded one wouldn't.
       const { manifest } = result;
+      // Updates from EAS Update say when they were published.
       const publishedAt = 'createdAt' in manifest ? new Date(manifest.createdAt) : undefined;
-      return { kind: 'available', publishedAt };
+      return { kind: 'available', release: releaseOfManifest(manifest), publishedAt };
     }
     // A rollback is applied the same way as an update: download, then restart.
-    if (result.isRollBackToEmbedded) return { kind: 'available' };
+    if (result.isRollBackToEmbedded) {
+      return { kind: 'available', release: releaseIn(Constants.expoConfig) };
+    }
     return { kind: 'upToDate' };
   } catch {
     return { kind: 'checkFailed' };
@@ -52,9 +78,18 @@ function formatMoment(date: Date): string {
   return formatDueDateTime(toDateKey(date), toTimeKey(date.getHours(), date.getMinutes()));
 }
 
-/** "Version 1.0.0 · Updated Today, 4:12 pm", or "· As installed" before any update. */
-function versionLine(currentlyRunning: Updates.UseUpdatesReturnType['currentlyRunning']): string {
-  const version = `Version ${Constants.expoConfig?.version ?? '–'}`;
+/** "Version 1.1.2 · Released Today, 4:12 pm". */
+function foundLine({ release, publishedAt }: Found): string {
+  const version = release.version ? `Version ${release.version}` : 'A new version';
+  return publishedAt ? `${version} · Released ${formatMoment(publishedAt)}` : version;
+}
+
+/** "Version 1.1.1 · Updated Today, 4:12 pm", or "· As installed" before any update. */
+function currentLine(
+  release: Release,
+  currentlyRunning: Updates.UseUpdatesReturnType['currentlyRunning'],
+): string {
+  const version = `Version ${release.version ?? '–'}`;
   if (!Updates.isEnabled) return version;
   if (currentlyRunning.isEmbeddedLaunch || !currentlyRunning.createdAt) {
     return `${version} · As installed`;
@@ -62,23 +97,18 @@ function versionLine(currentlyRunning: Updates.UseUpdatesReturnType['currentlyRu
   return `${version} · Updated ${formatMoment(currentlyRunning.createdAt)}`;
 }
 
-type ButtonProps = {
-  label: string;
-  onPress?: () => void;
-  /** Grey instead of yellow, for the less important "Check again". */
-  secondary?: boolean;
-  disabled?: boolean;
-};
+type ButtonProps = { label: string; onPress?: () => void; disabled?: boolean };
 
-function SheetButton({ label, onPress, secondary = false, disabled = false }: ButtonProps) {
+/** The page's one button, at the bottom. */
+function BottomButton({ label, onPress, disabled = false }: ButtonProps) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
-        secondary && styles.buttonSecondary,
-        pressed && (secondary ? styles.buttonSecondaryPressed : styles.buttonPressed),
+        pressed && styles.buttonPressed,
         disabled && styles.buttonDisabled,
       ]}
       accessibilityRole="button"
@@ -90,23 +120,24 @@ function SheetButton({ label, onPress, secondary = false, disabled = false }: Bu
 }
 
 /**
- * Sheet for over-the-air updates (EAS Update), opened from Profile's Check for Updates. It
- * checks as soon as it opens and says what it found: up to date, an update to download (which
- * then restarts the app into it), or one already downloaded that's waiting for a restart. The
- * app also checks by itself each time it opens and downloads in the background, so that last one
- * is common. Updates only come to the installed app: in development and Expo Go, the sheet says
- * so instead.
+ * The Updates page for over-the-air updates (EAS Update), opened from Profile's Check for
+ * Updates. It checks as soon as it opens. With an update out, it shows that version's name,
+ * when it came out and what's new, and the button at the bottom updates (downloads it and
+ * restarts into it). Otherwise it shows the version running now and what's in it, with Check
+ * for updates at the bottom. The app also checks by itself each time it opens and downloads in
+ * the background, so an update is often already downloaded and only needs the restart.
+ * Updates only come to the installed app: in development and Expo Go, the page says so.
  */
 export default function UpdatesScreen() {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { currentlyRunning, isUpdatePending, downloadProgress, isRestarting } =
+  const { currentlyRunning, isUpdatePending, downloadedUpdate, downloadProgress, isRestarting } =
     Updates.useUpdates();
   const [status, setStatus] = useState<Status>({ kind: 'checking' });
   // Decided once, on opening: an update finishing its download meanwhile shouldn't check again.
   const [checkOnOpen] = useState(() => Updates.isEnabled && !isUpdatePending);
+  const current = releaseIn(Constants.expoConfig);
 
-  // Checks on opening (the sheet starts out saying it's checking), unless updates are off here
-  // or one is already waiting.
   useEffect(() => {
     if (!checkOnOpen) return;
     let open = true;
@@ -123,8 +154,8 @@ export default function UpdatesScreen() {
     void askServer().then(setStatus);
   };
 
-  const download = async () => {
-    setStatus({ kind: 'downloading' });
+  const download = async (found: Found) => {
+    setStatus({ kind: 'downloading', ...found });
     try {
       const result = await Updates.fetchUpdateAsync();
       if (result.isNew || result.isRollBackToEmbedded) {
@@ -135,166 +166,179 @@ export default function UpdatesScreen() {
       // Nothing new after all (say, it was taken back on the server).
       setStatus({ kind: 'upToDate' });
     } catch {
-      setStatus({ kind: 'downloadFailed' });
+      setStatus({ kind: 'downloadFailed', ...found });
     }
   };
 
   const restart = () => {
-    Updates.reloadAsync().catch(() => setStatus({ kind: 'downloadFailed' }));
+    Updates.reloadAsync().catch(() => setStatus({ kind: 'checkFailed' }));
   };
 
-  // What to show, worked out in one place so the layout below stays the same for every state.
-  // No icon means busy: a spinner shows in its place.
-  let icon: LucideIcon | null = null;
-  let tint: string = colors.ink;
-  let tintBackground: string = colors.inputBackground;
+  // What to show, worked out in one place so the layout below is the same for every state:
+  // a title, a line under it, what's new (in the update, or in the version running now), and
+  // the button.
   let title: string;
-  let body: string;
-  let button: ButtonProps | null = null;
+  let subtitle: string;
+  let notesTitle = 'In this version';
+  let notes = current.notes;
+  let note: string | null = null;
+  let button: ButtonProps;
 
   if (!Updates.isEnabled) {
-    icon = Info;
-    tint = colors.textMuted;
-    title = 'Updates are off here';
-    body =
-      'Updates come to the installed app. While developing, it runs the latest code from your computer.';
+    title = 'Updates come to the installed app';
+    subtitle = 'While developing, Dooist runs the latest code from your computer.';
+    button = { label: 'Check for updates', disabled: true };
   } else if (isUpdatePending || isRestarting) {
-    icon = isRestarting ? null : CircleArrowDown;
-    tint = colors.skyDark;
-    tintBackground = colors.skySoft;
+    const found: Found = {
+      release: releaseOfManifest(downloadedUpdate?.manifest),
+      publishedAt: downloadedUpdate?.createdAt,
+    };
     title = 'Update ready';
-    body = 'It’s downloaded. Restart Dooist to start using it.';
-    button = { label: isRestarting ? 'Restarting…' : 'Restart now', onPress: restart, disabled: isRestarting };
+    subtitle = foundLine(found);
+    notesTitle = 'What’s new';
+    notes = found.release.notes;
+    note = 'It’s downloaded. Dooist restarts to start using it.';
+    button = isRestarting
+      ? { label: 'Restarting…', disabled: true }
+      : { label: 'Update', onPress: restart };
   } else {
     switch (status.kind) {
       case 'checking':
         title = 'Checking for updates…';
-        body = 'This only takes a moment.';
+        subtitle = currentLine(current, currentlyRunning);
         button = { label: 'Checking…', disabled: true };
         break;
+      case 'upToDate':
+        title = 'You’re up to date';
+        subtitle = currentLine(current, currentlyRunning);
+        button = { label: 'Check for updates', onPress: check };
+        break;
+      case 'checkFailed':
+        title = 'Couldn’t check for updates';
+        subtitle = 'Check your internet connection and try again.';
+        button = { label: 'Check for updates', onPress: check };
+        break;
       case 'available':
-        icon = CircleArrowDown;
-        tint = colors.skyDark;
-        tintBackground = colors.skySoft;
         title = 'Update available';
-        body = status.publishedAt
-          ? `A new version came out ${formatMoment(status.publishedAt)}. Dooist restarts once it’s downloaded.`
-          : 'A new version is out. Dooist restarts once it’s downloaded.';
-        button = { label: 'Update now', onPress: () => void download() };
+        subtitle = foundLine(status);
+        notesTitle = 'What’s new';
+        notes = status.release.notes;
+        note = 'Dooist restarts by itself once the update is downloaded.';
+        button = { label: 'Update', onPress: () => void download(status) };
         break;
       case 'downloading': {
-        tint = colors.skyDark;
-        tintBackground = colors.skySoft;
+        title = 'Downloading update…';
+        subtitle = foundLine(status);
+        notesTitle = 'What’s new';
+        notes = status.release.notes;
+        note = 'Keep Dooist open. It restarts by itself when it’s done.';
         const percent =
           downloadProgress !== undefined ? ` ${Math.round(downloadProgress * 100)}%` : '';
-        title = 'Downloading update…';
-        body = 'Keep Dooist open. It restarts by itself when it’s done.';
         button = { label: `Downloading…${percent}`, disabled: true };
         break;
       }
-      case 'upToDate':
-        icon = CircleCheck;
-        tint = colors.success;
-        title = 'You’re up to date';
-        body = 'You have the latest version of Dooist.';
-        button = { label: 'Check again', onPress: check, secondary: true };
-        break;
-      case 'checkFailed':
-        icon = CircleAlert;
-        tint = colors.danger;
-        tintBackground = colors.dangerSoft;
-        title = 'Couldn’t check for updates';
-        body = 'Check your internet connection and try again.';
-        button = { label: 'Try again', onPress: check };
-        break;
       case 'downloadFailed':
-        icon = CircleAlert;
-        tint = colors.danger;
-        tintBackground = colors.dangerSoft;
         title = 'Couldn’t download the update';
-        body = 'Check your internet connection and try again.';
-        button = { label: 'Try again', onPress: () => void download() };
+        subtitle = 'Check your internet connection and try again.';
+        notesTitle = 'What’s new';
+        notes = status.release.notes;
+        button = { label: 'Update', onPress: () => void download(status) };
         break;
     }
   }
 
-  const Icon = icon;
-  // iOS already pads the sheet for the home indicator; Android needs room for the nav bar.
-  const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 16) : 24;
-
   return (
-    <View style={[styles.screen, { paddingBottom: bottomPadding }]}>
-      <SheetGrabber />
-      <Text style={styles.heading} accessibilityRole="header">
-        Updates
-      </Text>
+    <View style={styles.page}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View accessibilityLiveRegion="polite">
+          <Text style={styles.title} accessibilityRole="header">
+            {title}
+          </Text>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+        </View>
 
-      <View style={styles.status} accessibilityLiveRegion="polite">
-        <View style={[styles.badge, { backgroundColor: tintBackground }]}>
-          {Icon ? (
-            <Icon size={ICON_SIZE} color={tint} />
-          ) : (
-            <ActivityIndicator color={tint} />
-          )}
-        </View>
-        <View style={styles.statusText}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.body}>{body}</Text>
-        </View>
+        {notes.length > 0 ? (
+          <View style={styles.notes}>
+            <Text style={styles.notesTitle}>{notesTitle}</Text>
+            {notes.map((line, index) => (
+              <View key={index} style={styles.noteRow}>
+                <Text style={styles.bullet}>•</Text>
+                <Text style={styles.noteText}>{line}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {note ? <Text style={styles.note}>{note}</Text> : null}
+      </ScrollView>
+
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 16 }]}>
+        <BottomButton {...button} />
       </View>
-
-      {button ? <SheetButton {...button} /> : null}
-
-      <Text style={styles.version}>{versionLine(currentlyRunning)}</Text>
     </View>
   );
 }
 
-const BADGE_SIZE = 44;
-
-const styles = StyleSheet.create({
-  screen: {
-    backgroundColor: colors.surface,
-    paddingTop: Platform.OS === 'android' ? 10 : 24,
-    paddingHorizontal: 20,
+const useStyles = createThemedStyles((colors) => ({
+  page: {
+    flex: 1,
+    backgroundColor: colors.page,
   },
-  // As on the app's other sheets.
-  heading: {
-    marginBottom: 16,
-    fontSize: 20,
+  content: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    gap: 24,
+  },
+  title: {
+    fontSize: 22,
     fontWeight: '700',
     color: colors.text,
   },
-  status: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
+  subtitle: {
+    marginTop: 6,
+    fontSize: 15,
+    lineHeight: 21,
+    color: colors.textMuted,
   },
-  badge: {
-    width: BADGE_SIZE,
-    height: BADGE_SIZE,
-    borderRadius: BADGE_SIZE / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+  notes: {
+    gap: 10,
   },
-  statusText: {
-    flex: 1,
-    gap: 2,
-    paddingTop: 2,
-  },
-  title: {
-    fontSize: 16,
+  notesTitle: {
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.textMuted,
+  },
+  noteRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  bullet: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: colors.primary,
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
     color: colors.text,
   },
-  body: {
+  note: {
     fontSize: 14,
     lineHeight: 20,
     color: colors.textMuted,
   },
-  // Same as the reminder and due-date sheets' main button.
+  // The button keeps to the bottom, with a line between it and what scrolls above.
+  bottom: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    backgroundColor: colors.page,
+  },
+  // Same as the app's other main buttons.
   button: {
-    marginTop: 20,
     height: 52,
     borderRadius: 12,
     backgroundColor: colors.primary,
@@ -304,12 +348,6 @@ const styles = StyleSheet.create({
   buttonPressed: {
     backgroundColor: colors.primaryPressed,
   },
-  buttonSecondary: {
-    backgroundColor: colors.inputBackground,
-  },
-  buttonSecondaryPressed: {
-    backgroundColor: colors.border,
-  },
   buttonDisabled: {
     opacity: 0.5,
   },
@@ -318,10 +356,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onPrimary,
   },
-  version: {
-    marginTop: 16,
-    textAlign: 'center',
-    fontSize: 13,
-    color: colors.textSubtle,
-  },
-});
+}));

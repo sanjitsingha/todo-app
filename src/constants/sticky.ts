@@ -1,18 +1,21 @@
-import { colors } from '@/constants/theme';
+import { lightColors } from '@/constants/theme';
 import type { StickyColor } from '@/store/stickies';
 
-/** The colors a sticky can be, in the order the editor offers them. Yellow is the default. */
+/**
+ * The colors a sticky can be, in the order the editor offers them. Yellow is the default. Pale
+ * like paper notes in both looks (the dark one has the same), with dark text on them.
+ */
 export const STICKY_COLORS: readonly { value: StickyColor; label: string; fill: string }[] = [
-  { value: 'yellow', label: 'Yellow', fill: colors.stickyYellow },
-  { value: 'pink', label: 'Pink', fill: colors.stickyPink },
-  { value: 'blue', label: 'Blue', fill: colors.stickyBlue },
-  { value: 'green', label: 'Green', fill: colors.stickyGreen },
-  { value: 'purple', label: 'Purple', fill: colors.stickyPurple },
-  { value: 'orange', label: 'Orange', fill: colors.stickyOrange },
+  { value: 'yellow', label: 'Yellow', fill: lightColors.stickyYellow },
+  { value: 'pink', label: 'Pink', fill: lightColors.stickyPink },
+  { value: 'blue', label: 'Blue', fill: lightColors.stickyBlue },
+  { value: 'green', label: 'Green', fill: lightColors.stickyGreen },
+  { value: 'purple', label: 'Purple', fill: lightColors.stickyPurple },
+  { value: 'orange', label: 'Orange', fill: lightColors.stickyOrange },
 ];
 
 export function stickyFill(color: StickyColor): string {
-  return STICKY_COLORS.find((option) => option.value === color)?.fill ?? colors.stickyYellow;
+  return STICKY_COLORS.find((option) => option.value === color)?.fill ?? lightColors.stickyYellow;
 }
 
 /**

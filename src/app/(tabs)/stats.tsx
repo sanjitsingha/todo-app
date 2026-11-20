@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { ChipGroup, type ChipOption } from '@/components/ChipGroup';
 import { OnTimeSummary } from '@/components/OnTimeSummary';
 import { TodosWrittenChart, type ChartRange } from '@/components/TodosWrittenChart';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 const RANGE_OPTIONS: readonly ChipOption<ChartRange>[] = [
   { value: 'today', label: 'Today' },
@@ -18,6 +18,7 @@ const RANGE_OPTIONS: readonly ChipOption<ChartRange>[] = [
  * chips just under the header pick the range for both; they stay put while the cards scroll.
  */
 export default function StatsScreen() {
+  const styles = useStyles();
   const [range, setRange] = useState<ChartRange>('week');
 
   return (
@@ -50,7 +51,7 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     flex: 1,
   },
@@ -73,4 +74,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-});
+}));

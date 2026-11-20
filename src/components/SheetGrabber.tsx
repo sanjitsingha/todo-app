@@ -1,17 +1,18 @@
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 /**
  * Drag handle for the top of a sheet that can be pulled up. iOS draws its own
  * (`sheetGrabberVisible` in src/app/_layout.tsx), so this only renders on Android.
  */
 export function SheetGrabber() {
+  const styles = useStyles();
   if (Platform.OS !== 'android') return null;
   return <View style={styles.grabber} />;
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   grabber: {
     alignSelf: 'center',
     width: 36,
@@ -20,4 +21,4 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     backgroundColor: colors.border,
   },
-});
+}));

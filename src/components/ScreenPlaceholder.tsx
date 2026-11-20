@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import type { ComponentProps } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -17,6 +17,8 @@ type Props = {
  * Has no background of its own, so it blends into whatever it sits on.
  */
 export function ScreenPlaceholder({ icon, title, subtitle }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <View style={styles.container}>
       <Ionicons name={icon} size={48} color={colors.iconInactive} />
@@ -26,7 +28,7 @@ export function ScreenPlaceholder({ icon, title, subtitle }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     flex: 1,
     alignItems: 'center',
@@ -45,4 +47,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
   },
-});
+}));

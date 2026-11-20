@@ -1,7 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+// Just this icon, not the whole icon set.
+import Trash2 from 'lucide-react-native/icons/trash-2';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
+  Alert,
   Keyboard,
   Platform,
   Pressable,
@@ -16,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PriorityField } from '@/components/PriorityField';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { DueDateChip, dueLabel, ReminderChip } from '@/components/TodoChips';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { formatTime } from '@/lib/dates';
 import { useTodos, type Todo } from '@/store/todos';
 
@@ -25,13 +28,16 @@ import { useTodos, type Todo } from '@/store/todos';
  * sheet, see src/app/_layout.tsx). Everything in it can be changed in place, with no separate
  * edit mode: tap the name or description to type, tap Due date or Reminder for their sheets
  * (which save to this todo and come back here), or tap a priority. The button at the bottom
- * marks it done (or not done) and closes the sheet.
+ * marks it done (or not done) and closes the sheet. The trash beside the name deletes it, after
+ * asking.
  */
 export default function TodoDetailsScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { todos, updateTodo, toggleTodo } = useTodos();
+  const { todos, updateTodo, toggleTodo, deleteTodo } = useTodos();
   // While the sheet slides away after the button is pressed, it keeps showing the todo as it
   // was, instead of flipping to the new state on the way out.
   const [closingWith, setClosingWith] = useState<Todo | null>(null);
@@ -50,6 +56,24 @@ export default function TodoDetailsScreen() {
 
   // iOS already pads the sheet for the home indicator; Android needs room for the nav bar.
   const bottomPadding = Platform.OS === 'android' ? Math.max(insets.bottom, 16) : 24;
+
+  // Asks first. Deleted, the sheet closes still showing the todo, rather than "isn't here".
+  const confirmDelete = () => {
+    if (!todo) return;
+    Keyboard.dismiss();
+    Alert.alert('Delete this todo?', `“${todo.title}” will be deleted. This can’t be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setClosingWith(todo);
+          deleteTodo(todo.id);
+          router.back();
+        },
+      },
+    ]);
+  };
 
   if (!todo) {
     return (
@@ -103,24 +127,41 @@ export default function TodoDetailsScreen() {
     >
       <SheetGrabber />
 
-      {/* Looks like plain text until tapped. Multiline only so a long name wraps: Enter
-          finishes editing, and pasted line breaks become spaces. */}
-      <TextInput
-        style={[styles.input, styles.title, todo.completed && styles.titleCompleted]}
-        {...title}
-        placeholder="Todo name"
-        placeholderTextColor={colors.textMuted}
-        maxLength={120}
-        multiline
-        // Just the line cursor: hides the drop-shaped handle Android puts under it.
-        selectionHandleColor="transparent"
-        returnKeyType="done"
-        submitBehavior="blurAndSubmit"
-        // Web ignores submitBehavior; this is what makes Enter finish there.
-        blurOnSubmit={Platform.OS === 'web'}
-        accessibilityLabel="Todo name"
-        accessibilityHint="Edits the name"
-      />
+      {/* The name, with the trash at its right. */}
+      <View style={styles.titleRow}>
+        {/* Looks like plain text until tapped. Multiline only so a long name wraps: Enter
+            finishes editing, and pasted line breaks become spaces. */}
+        <TextInput
+          style={[
+            styles.input,
+            styles.title,
+            styles.titleInput,
+            todo.completed && styles.titleCompleted,
+          ]}
+          {...title}
+          placeholder="Todo name"
+          placeholderTextColor={colors.textMuted}
+          maxLength={120}
+          multiline
+          // Just the line cursor: hides the drop-shaped handle Android puts under it.
+          selectionHandleColor="transparent"
+          returnKeyType="done"
+          submitBehavior="blurAndSubmit"
+          // Web ignores submitBehavior; this is what makes Enter finish there.
+          blurOnSubmit={Platform.OS === 'web'}
+          accessibilityLabel="Todo name"
+          accessibilityHint="Edits the name"
+        />
+        <Pressable
+          onPress={confirmDelete}
+          hitSlop={10}
+          style={({ pressed }) => [styles.delete, pressed && styles.deletePressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Delete todo"
+        >
+          <Trash2 size={DELETE_ICON_SIZE} color={colors.danger} />
+        </Pressable>
+      </View>
       <TextInput
         style={[styles.input, styles.description]}
         {...description}
@@ -242,6 +283,8 @@ function DetailRow({
   accessibilityHint: string;
   children: ReactNode;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -263,7 +306,10 @@ function DetailRow({
   );
 }
 
-const styles = StyleSheet.create({
+/** A size down from the other icons in the sheet, so it stays out of the way of the name. */
+const DELETE_ICON_SIZE = 18;
+
+const useStyles = createThemedStyles((colors) => ({
   // Fills the sheet, so it's white all the way down when dragged to full screen.
   screen: {
     flex: 1,
@@ -294,6 +340,24 @@ const styles = StyleSheet.create({
   titleCompleted: {
     color: colors.textSubtle,
     textDecorationLine: 'line-through',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  // Takes the row, so a long name wraps before the trash.
+  titleInput: {
+    flex: 1,
+  },
+  // Lined up with the name's first line: its top padding (8), plus half its line height (14),
+  // less half the icon.
+  delete: {
+    marginTop: 8 + 14 - DELETE_ICON_SIZE / 2,
+    borderRadius: 8,
+  },
+  deletePressed: {
+    opacity: 0.5,
   },
   description: {
     paddingTop: 4,
@@ -373,4 +437,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textMuted,
   },
-});
+}));

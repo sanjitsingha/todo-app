@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { formatLongDate, headerMonth, type DateKey } from '@/lib/dates';
 
 type Props = {
@@ -21,6 +21,7 @@ type Props = {
  * full date.
  */
 export function DateHeader({ date, accessory, action }: Props) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { month, year } = headerMonth(date);
 
@@ -45,7 +46,7 @@ export function DateHeader({ date, accessory, action }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -72,4 +73,4 @@ const styles = StyleSheet.create({
   year: {
     color: colors.textMuted,
   },
-});
+}));

@@ -1,15 +1,15 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, ScrollView, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { TimePicker } from '@/components/TimePicker';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { useNow } from '@/hooks/useNow';
 import { parseDurationParam, toAddSheetParams } from '@/lib/addSheetParams';
 import {
-  defaultTime,
+  currentTime,
   fromDayMinutes,
   isDateKey,
   isTimeKey,
@@ -31,6 +31,7 @@ import { useTodos } from '@/store/todos';
  * Times that have already passed are faded in the picker and can't be picked.
  */
 export default function ReminderScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { todayKey } = useSelectedDate();
@@ -50,7 +51,7 @@ export default function ReminderScreen() {
   const [initialValue] = useState(() => (isTimeKey(params.value) ? params.value : undefined));
   // Starts on the current reminder, else the due time, else the next whole hour (or 9:00 am).
   const [picked, setPicked] = useState<TimeKey>(
-    () => initialValue ?? dueTime ?? defaultTime(dueDate, now),
+    () => initialValue ?? dueTime ?? currentTime(now),
   );
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +132,7 @@ export default function ReminderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -193,4 +194,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.danger,
   },
-});
+}));

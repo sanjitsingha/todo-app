@@ -14,8 +14,8 @@ export type FeedbackMode = 'vibrate' | 'tick' | 'tickVibrate' | 'none';
 export type TodoView = 'list' | 'timeline';
 
 /**
- * The app's look: light, dark, or following the phone. Only saved for now; the app is always
- * light until a dark theme is built.
+ * The app's look: light, dark, or following the phone (src/hooks/useTheme.ts). Saved with the
+ * other settings, so it follows the account to other phones.
  */
 export type Appearance = 'light' | 'dark' | 'system';
 

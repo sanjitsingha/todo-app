@@ -16,7 +16,7 @@ import {
   useStickyDrag,
 } from '@/components/StickyNote';
 import { FEATURES } from '@/constants/features';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { tick } from '@/lib/feedback';
 import { findFreeSpot, type WallSize } from '@/lib/stickyLayout';
 import { useStickies } from '@/store/stickies';
@@ -38,6 +38,8 @@ export default function StickyRoute() {
  * it to move it, or drag it onto the bin that comes up at the bottom to take it down.
  */
 function StickyScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const { stickies, addSticky, editSticky, moveSticky, removeSticky } = useStickies();
   // The wall's full size. The keyboard can squeeze the wall (on Android) while a sticky is
   // written; new ones still go on the whole wall, as it is without the keyboard.
@@ -164,7 +166,7 @@ function StickyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Stickies dragged past the edge are cut off there, not drawn over the header or tab bar.
   wall: {
     flex: 1,
@@ -215,4 +217,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onInk,
   },
-});
+}));

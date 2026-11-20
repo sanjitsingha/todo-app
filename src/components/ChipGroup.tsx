@@ -1,6 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 export type ChipOption<T extends string> = {
   value: T;
@@ -17,7 +17,7 @@ type Props<T extends string> = {
 
 /**
  * A row of pill buttons, one picked at a time, like the Stats tab's Today / Week / Month. The
- * picked one is the app's yellow; the rest are white, for a gray page.
+ * picked one is the Dooist orange (primary); the rest are white, for a gray page.
  */
 export function ChipGroup<T extends string>({
   value,
@@ -25,6 +25,7 @@ export function ChipGroup<T extends string>({
   onChange,
   accessibilityLabel,
 }: Props<T>) {
+  const styles = useStyles();
   return (
     <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel={accessibilityLabel}>
       {options.map((option) => {
@@ -51,7 +52,7 @@ export function ChipGroup<T extends string>({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     flexDirection: 'row',
     gap: 8,
@@ -80,4 +81,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onPrimary,
   },
-});
+}));

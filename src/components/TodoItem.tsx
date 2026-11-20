@@ -3,7 +3,7 @@ import { useRouter } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DueDateChip, dueLabel, priorityOf } from '@/components/TodoChips';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useTodos, type Todo } from '@/store/todos';
 
 /**
@@ -13,9 +13,11 @@ import { useTodos, type Todo } from '@/store/todos';
  * (src/app/todo/[id].tsx), which also shows the description.
  */
 export function TodoItem({ todo }: { todo: Todo }) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const { toggleTodo } = useTodos();
-  const priority = priorityOf(todo);
+  const priority = priorityOf(todo, colors);
 
   return (
     <View style={[styles.row, !todo.completed && { backgroundColor: priority.background }]}>
@@ -79,9 +81,9 @@ const CHECKBOX_MARGIN = (TITLE_LINE_HEIGHT - CHECKBOX_SIZE) / 2;
 // worked out from the checkbox's, so the two curves run parallel.
 const CARD_RADIUS = CHECKBOX_RADIUS + CARD_PADDING + CHECKBOX_MARGIN;
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Lined up with the 16px edges of the rest of the screen. Tinted by priority while open (see
-  // TodoItem); done, a very light gray (the same gray as behind the date strip).
+  // TodoItem); done, the card color (a very light gray in the light look).
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -91,7 +93,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     padding: CARD_PADDING,
     borderRadius: CARD_RADIUS,
-    backgroundColor: colors.background,
+    backgroundColor: colors.card,
     // Keeps the Android ripple inside the rounded corners.
     overflow: 'hidden',
   },
@@ -106,7 +108,7 @@ const styles = StyleSheet.create({
     borderRadius: CHECKBOX_RADIUS,
     borderWidth: 1.5,
     borderColor: colors.iconInactive,
-    // White, so the empty box stands out on the tinted card. Checked, it turns yellow.
+    // White, so the empty box stands out on the tinted card. Checked, it turns the Dooist orange.
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
@@ -137,4 +139,4 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-});
+}));

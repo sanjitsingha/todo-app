@@ -1,16 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type ReactNode, type Ref } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputInstance,
-  type TextInputProps,
-} from 'react-native';
+import { Pressable, Text, TextInput, View, type TextInputInstance, type TextInputProps } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 type Props = Omit<TextInputProps, 'style' | 'secureTextEntry' | 'ref'> & {
   ref?: Ref<TextInputInstance>;
@@ -19,6 +11,15 @@ type Props = Omit<TextInputProps, 'style' | 'secureTextEntry' | 'ref'> & {
   labelAction?: ReactNode;
   /** Hides what's typed, with an eye button to show it. */
   secure?: boolean;
+  /**
+   * Whether a `secure` field shows what's typed, when its parent decides (so one eye can show
+   * two fields, like a new password and its confirmation). Left out, the field's own eye does.
+   */
+  revealed?: boolean;
+  /** Called by the eye with the new `revealed`. */
+  onRevealedChange?: (revealed: boolean) => void;
+  /** False leaves out the eye, for a field another field's eye shows (with `revealed`). */
+  revealButton?: boolean;
   /** A line of help under the field. */
   hint?: string;
   /** What's wrong with what's typed, e.g. "At least 8 characters": in red, in place of `hint`. */
@@ -32,14 +33,18 @@ type Props = Omit<TextInputProps, 'style' | 'secureTextEntry' | 'ref'> & {
 };
 
 /**
- * A labeled text field for the auth screens: a soft gray box that turns white with a dark
- * outline while you type in it (or stays gray with no label or outline, when `minimal`).
+ * A labeled text field for the auth screens and Account: a soft gray box that turns to the
+ * surface color, outlined in the Dooist orange, while you type in it (or stays gray with no label
+ * or outline, when `minimal`).
  */
 export function AuthField({
   ref,
   label,
   labelAction,
   secure = false,
+  revealed,
+  onRevealedChange,
+  revealButton = true,
   hint,
   error,
   minimal = false,
@@ -47,8 +52,16 @@ export function AuthField({
   onBlur,
   ...inputProps
 }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const [focused, setFocused] = useState(false);
-  const [hidden, setHidden] = useState(true);
+  const [ownHidden, setOwnHidden] = useState(true);
+  const hidden = revealed === undefined ? ownHidden : !revealed;
+
+  const toggleHidden = () => {
+    if (revealed === undefined) setOwnHidden(!hidden);
+    onRevealedChange?.(hidden);
+  };
 
   return (
     <View>
@@ -80,9 +93,9 @@ export function AuthField({
           }}
           {...inputProps}
         />
-        {secure ? (
+        {secure && revealButton ? (
           <Pressable
-            onPress={() => setHidden((current) => !current)}
+            onPress={toggleHidden}
             hitSlop={10}
             style={styles.eye}
             accessibilityRole="button"
@@ -108,7 +121,7 @@ export function AuthField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -132,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.inputBackground,
   },
   boxFocused: {
-    borderColor: colors.ink,
+    borderColor: colors.primary,
     backgroundColor: colors.surface,
   },
   boxMinimal: {
@@ -160,4 +173,4 @@ const styles = StyleSheet.create({
   error: {
     color: colors.danger,
   },
-});
+}));

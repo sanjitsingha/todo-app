@@ -2,6 +2,17 @@ import { isRunningInExpoGo } from 'expo';
 import Constants, { AppOwnership } from 'expo-constants';
 import { getBundleOrigin } from 'expo/internal/bundle-origin';
 import * as Linking from 'expo-linking';
+import type { AuthSessionOpenOptions } from 'expo-web-browser';
+
+/**
+ * How to open the in-app browser for a page that comes back to the app (Google sign-in,
+ * connecting Google Calendar). On Android the browser opens inside the app's own task, so coming
+ * back to the app closes it. By default it gets a task of its own, and Android can't close that
+ * one: it stays open in the background, still on the last page, and the next time the browser
+ * opens, that old page can come back instead (an old sign-in, which then ends on the Supabase
+ * Site URL). iOS ignores this.
+ */
+export const BROWSER_RETURN_OPTIONS: AuthSessionOpenOptions = { createTask: false };
 
 function inExpoGo(): boolean {
   try {

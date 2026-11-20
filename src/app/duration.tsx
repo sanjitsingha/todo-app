@@ -1,11 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import { Platform, Pressable, ScrollView, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DurationPicker } from '@/components/DurationPicker';
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { parseDurationParam, toAddSheetParams } from '@/lib/addSheetParams';
 import { isDateKey, isTimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
@@ -19,6 +19,7 @@ const DEFAULT_DURATION = 30;
  * other picks to pass back through. It hands the pick back as the add sheet's `duration` param.
  */
 export default function DurationScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { todayKey } = useSelectedDate();
@@ -88,7 +89,7 @@ export default function DurationScreen() {
 }
 
 // The same as the reminder sheet (src/app/reminder.tsx).
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -140,4 +141,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.danger,
   },
-});
+}));

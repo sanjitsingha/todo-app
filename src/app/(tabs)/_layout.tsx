@@ -1,10 +1,12 @@
 import { Tabs } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/tabs';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import { BackButton } from '@/components/BackButton';
 import { BottomNavBar } from '@/components/BottomNavBar';
-import { colors } from '@/constants/theme';
+import { NotificationBell } from '@/components/NotificationBell';
+import type { ThemeColors } from '@/constants/theme';
+import { useColors } from '@/hooks/useTheme';
 import { useSelectedDate } from '@/store/selectedDate';
 
 /**
@@ -25,24 +27,30 @@ function TabBar(props: BottomTabBarProps) {
   return <BottomNavBar {...props} />;
 }
 
-/** White page with a flat white header, so the header reads as part of the page. */
-const PAGE_OPTIONS = {
-  headerLeft: () => <BackButton />,
-  headerTitleAlign: 'left',
-  headerTitleStyle: { fontSize: 22, fontWeight: '700', color: colors.text },
-  headerStyle: { backgroundColor: colors.surface },
-  headerShadowVisible: false,
-  sceneStyle: { backgroundColor: colors.surface },
-} as const;
-
-/** The same, on a very light gray (the gray behind the Todo tab's date strip). */
-const GRAY_PAGE_OPTIONS = {
-  ...PAGE_OPTIONS,
-  headerStyle: { backgroundColor: colors.background },
-  sceneStyle: { backgroundColor: colors.background },
-} as const;
+/**
+ * Options for a page in `colors`, with a flat header. `gray` is a gray page (the light gray
+ * behind the Todo tab's date strip) rather than a white one. In the light look the header is
+ * the page's own color, so it reads as part of the page; in the dark look every page is the
+ * darkest gray and its header a step lighter.
+ */
+function pageOptions(colors: ThemeColors, gray = false) {
+  const backgroundColor = gray ? colors.background : colors.page;
+  const headerColor = gray ? colors.headerBackground : colors.pageHeader;
+  return {
+    headerLeft: () => <BackButton />,
+    headerTitleAlign: 'left',
+    headerTitleStyle: { fontSize: 22, fontWeight: '700', color: colors.text },
+    headerStyle: { backgroundColor: headerColor },
+    headerShadowVisible: false,
+    sceneStyle: { backgroundColor },
+  } as const;
+}
 
 export default function TabsLayout() {
+  const colors = useColors();
+  const page = useMemo(() => pageOptions(colors), [colors]);
+  const grayPage = useMemo(() => pageOptions(colors, true), [colors]);
+
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}
@@ -50,11 +58,15 @@ export default function TabsLayout() {
     >
       {/* The Todo screen draws its own date header (src/components/DateHeader.tsx). */}
       <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false }} />
-      <Tabs.Screen name="stats" options={{ title: 'Stats', ...GRAY_PAGE_OPTIONS }} />
+      <Tabs.Screen name="stats" options={{ title: 'Stats', ...grayPage }} />
       {/* A dotted wall of sticky notes, on the same light gray. Hidden for now: no tab in the
           bar until FEATURES.sticky is turned on. */}
-      <Tabs.Screen name="sticky" options={{ title: 'Sticky', ...GRAY_PAGE_OPTIONS }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', ...PAGE_OPTIONS }} />
+      <Tabs.Screen name="sticky" options={{ title: 'Sticky', ...grayPage }} />
+      {/* With the bell for the Notifications page at the right of its header. */}
+      <Tabs.Screen
+        name="profile"
+        options={{ title: 'Profile', ...page, headerRight: () => <NotificationBell /> }}
+      />
     </Tabs>
   );
 }

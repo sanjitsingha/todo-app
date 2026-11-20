@@ -27,7 +27,7 @@ import {
   STICKY_SIZE,
   stickyFill,
 } from '@/constants/sticky';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import type { WallSize } from '@/lib/stickyLayout';
 import type { Sticky, StickyColor } from '@/store/stickies';
 
@@ -134,6 +134,7 @@ export function useStickyDrag(): StickyDrag {
  * Fills its parent, which places and turns it.
  */
 function StickyFace({ text, color }: { text: string; color: StickyColor }) {
+  const styles = useStyles();
   return (
     <View style={[styles.face, { backgroundColor: stickyFill(color) }]}>
       <Text style={styles.text} numberOfLines={STICKY_MAX_LINES}>
@@ -185,6 +186,7 @@ export function WallSticky({
   onBin,
   onBinHover,
 }: WallStickyProps) {
+  const styles = useStyles();
   const { id, x, y, rotation } = sticky;
 
   const pan = usePanGesture({
@@ -292,6 +294,7 @@ export function WallSticky({
  * shrinking over the bin, and shrinking away into it when dropped there. Taps go through it.
  */
 export function DraggedSticky({ sticky, drag }: { sticky: Sticky; drag: StickyDrag }) {
+  const styles = useStyles();
   const placed = useAnimatedStyle(() => {
     const lift = drag.lift.get();
     const binness = drag.binness.get();
@@ -323,6 +326,8 @@ export function DraggedSticky({ sticky, drag }: { sticky: Sticky; drag: StickyDr
  * turns red while one is held over it.
  */
 export function StickyBin({ drag }: { drag: StickyDrag }) {
+  const styles = useStyles();
+  const colors = useColors();
   const bin = useAnimatedStyle(() => {
     const shown = drag.active.get();
     const hover = drag.binness.get();
@@ -355,7 +360,7 @@ export function useHiddenWhileDragging(drag: StickyDrag) {
   return useAnimatedStyle(() => ({ opacity: 1 - drag.active.get() }));
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Placed by its transform, from the wall's top-left.
   sticky: {
     position: 'absolute',
@@ -377,7 +382,7 @@ const styles = StyleSheet.create({
     fontSize: STICKY_FONT_SIZE,
     lineHeight: STICKY_LINE_HEIGHT,
     fontWeight: '500',
-    color: colors.ink,
+    color: colors.stickyInk,
   },
   // Same size and color as the sticky, right behind it: only its shadow shows.
   liftedShadow: {
@@ -400,4 +405,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-});
+}));

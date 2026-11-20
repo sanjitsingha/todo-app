@@ -2,7 +2,13 @@ import Storage from 'expo-sqlite/kv-store';
 
 import type { TodoInsert, TodoRow } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
-import { getTodos, updateTodos, type Todo } from '@/store/todos';
+import {
+  forgetDeletedTodos,
+  getDeletedTodos,
+  getTodos,
+  updateTodos,
+  type Todo,
+} from '@/store/todos';
 
 /** Rows asked for or sent in one request. */
 const PAGE_SIZE = 500;
@@ -122,6 +128,26 @@ async function pushTodos(userId: string) {
 }
 
 /**
+ * Marks the todos deleted on the phone as deleted in the account (`deleted_at`), which is how
+ * the user's other phones and the Google Calendar sync hear of it. One that never reached the
+ * account matches no row, which is fine.
+ */
+async function pushDeletions(userId: string) {
+  if (!supabase) return;
+  const waiting = getDeletedTodos().filter((entry) => entry.userId === userId);
+  for (let start = 0; start < waiting.length; start += PAGE_SIZE) {
+    const ids = waiting.slice(start, start + PAGE_SIZE).map((entry) => entry.id);
+    const { error } = await supabase
+      .from('todos')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .in('id', ids);
+    if (error) throw error;
+    forgetDeletedTodos(new Set(ids));
+  }
+}
+
+/**
  * Brings in what changed in the account since the last pull: from the user's other phones, or
  * everything on the first pull. A todo changed on the phone and not sent yet keeps the phone's
  * version (it's sent next); one deleted in the account goes from the phone too.
@@ -146,10 +172,13 @@ async function pullTodos(userId: string) {
   }
   if (rows.length === 0) return;
 
+  // Deleted on the phone, and not marked deleted in the account yet: they stay gone.
+  const deletedHere = new Set(getDeletedTodos().map((entry) => entry.id));
   updateTodos((current) => {
     const byId = new Map(current.map((todo) => [todo.id, todo]));
     let any = false;
     for (const row of rows) {
+      if (deletedHere.has(row.id)) continue;
       const local = byId.get(row.id);
       if (local?.unsynced && local.userId === userId) continue;
       if (row.deleted_at) {
@@ -181,5 +210,6 @@ export async function syncTodos(userId: string) {
   if (!supabase) return;
   claimTodos(userId);
   await pushTodos(userId);
+  await pushDeletions(userId);
   await pullTodos(userId);
 }

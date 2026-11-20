@@ -10,7 +10,7 @@ import type { ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FEATURES } from '@/constants/features';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
 const TAB_ICON_SIZE = 22;
 /** Space between an icon and its name. */
@@ -53,6 +53,8 @@ type TabName = keyof typeof TABS;
  * around it, in their gray, that opens the Add todo sheet above the current tab.
  */
 export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
 
   const renderTab = (name: TabName) => {
@@ -117,7 +119,7 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   bar: {
     backgroundColor: colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -153,4 +155,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.ink,
   },
-});
+}));

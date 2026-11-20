@@ -14,9 +14,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DueDatePicker } from '@/components/DueDatePicker';
 import { DueTimeField } from '@/components/DueTimeField';
 import { SheetGrabber } from '@/components/SheetGrabber';
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 import { parseDurationParam, toAddSheetParams } from '@/lib/addSheetParams';
-import { defaultTime, isDateKey, isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
+import { currentTime, isDateKey, isTimeKey, type DateKey, type TimeKey } from '@/lib/dates';
 import { useSelectedDate } from '@/store/selectedDate';
 import { useTodos } from '@/store/todos';
 
@@ -31,6 +31,7 @@ import { useTodos } from '@/store/todos';
  * "Done" (there once a time is involved) keeps the day and saves the time.
  */
 export default function DueDateScreen() {
+  const styles = useStyles();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { today, todayKey } = useSelectedDate();
@@ -74,7 +75,8 @@ export default function DueDateScreen() {
 
   const addTime = () => {
     revealPicker.current = true;
-    setTime(defaultTime(current, today));
+    // The time right now, read as Add time is tapped.
+    setTime(currentTime());
   };
 
   // iOS already pads the sheet for the home indicator; Android needs room for the nav bar.
@@ -121,7 +123,7 @@ export default function DueDateScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   screen: {
     flex: 1,
     backgroundColor: colors.surface,
@@ -163,4 +165,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.onPrimary,
   },
-});
+}));

@@ -1,16 +1,38 @@
-import { Stack } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View } from 'react-native';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect, useMemo, type ReactNode } from 'react';
+import { Appearance, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { BackButton } from '@/components/BackButton';
 import { CloudSync } from '@/components/CloudSync';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors, useColorSchemeName } from '@/hooks/useTheme';
 import { AuthProvider, useAuth } from '@/store/auth';
 import { SelectedDateProvider } from '@/store/selectedDate';
+import { useSettings } from '@/store/settings';
 import { StickiesProvider } from '@/store/stickies';
 import { TodosProvider } from '@/store/todos';
 
+// The splash (the logo on white, app.json) stays up until the saved sign-in has been read
+// (Screens, below), rather than giving way to a blank page first. Called here, outside any
+// component, as Expo recommends, so it's early enough.
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Already hidden, or no splash (web): nothing to hold.
+});
+
+/** Longest the splash waits for the sign-in, in case reading it never finishes. */
+const SPLASH_TIMEOUT_MS = 5000;
+
 export default function RootLayout() {
+  const styles = useStyles();
+
+  useEffect(() => {
+    const timer = setTimeout(() => SplashScreen.hide(), SPLASH_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
   return (
     // Needed for gestures from react-native-gesture-handler (swiping between days, the
     // timeline's pinch to zoom, dragging stickies).
@@ -22,13 +44,61 @@ export default function RootLayout() {
                 Calendar when it's connected. Draws nothing. */}
             <CloudSync />
             <SelectedDateProvider>
-              <Screens />
-              <StatusBar style="dark" />
+              <ThemeSync>
+                <Screens />
+              </ThemeSync>
             </SelectedDateProvider>
           </StickiesProvider>
         </TodosProvider>
       </AuthProvider>
     </GestureHandlerRootView>
+  );
+}
+
+/**
+ * Puts the look picked in Appearance (Light, Dark, or the phone's for System) on everything
+ * around the screens: the phone's own parts of the app (alerts, the keyboard, sheets), the
+ * navigator's colors, the status bar, and the window behind the screens, so nothing flashes
+ * white in the dark look while a screen slides in.
+ */
+function ThemeSync({ children }: { children: ReactNode }) {
+  const { appearance } = useSettings();
+  const scheme = useColorSchemeName();
+  const colors = useColors();
+
+  // Light or Dark overrides the phone's look for the whole app; System hands it back ('auto').
+  useEffect(() => {
+    Appearance.setColorScheme(appearance === 'system' ? 'auto' : appearance);
+  }, [appearance]);
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.background).catch(() => {
+      // Only the window behind the screens; they draw their own backgrounds.
+    });
+  }, [colors.background]);
+
+  const navigationTheme = useMemo<Theme>(() => {
+    const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: colors.ink,
+        background: colors.background,
+        card: colors.surface,
+        text: colors.text,
+        border: colors.border,
+        notification: colors.danger,
+      },
+    };
+  }, [scheme, colors]);
+
+  return (
+    <ThemeProvider value={navigationTheme}>
+      {children}
+      {/* Dark text on the light look, light text on the dark one. */}
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+    </ThemeProvider>
   );
 }
 
@@ -39,7 +109,26 @@ export default function RootLayout() {
  * signs you in, but you land on the new password screen until it's saved.
  */
 function Screens() {
+  const styles = useStyles();
+  const colors = useColors();
+
+  /** A full page opened on top of the tabs, with a header like Profile's and a back arrow. */
+  const pageOptions = (title: string) =>
+    ({
+      title,
+      headerLeft: () => <BackButton />,
+      headerTitleAlign: 'left',
+      headerTitleStyle: { fontSize: 22, fontWeight: '700', color: colors.text },
+      headerStyle: { backgroundColor: colors.pageHeader },
+      headerShadowVisible: false,
+      contentStyle: { backgroundColor: colors.page },
+    }) as const;
   const { user, ready, resettingPassword } = useAuth();
+
+  // The sign-in is known: the first real screen can show.
+  useEffect(() => {
+    if (ready) SplashScreen.hide();
+  }, [ready]);
 
   // The saved sign-in is read back in a moment at launch. Until then, a blank page rather than
   // the login screen flashing up for someone who's signed in.
@@ -126,10 +215,19 @@ function Screens() {
             headerShown: false,
           }}
         />
-        {/* Opened from Profile: checks for an over-the-air update and offers to install it.
-            Just as tall as what it says. */}
+        {/* Opened from Profile's Check for Updates: a page that checks for an over-the-air
+            update, shows what's new, and installs it. */}
+        <Stack.Screen name="updates" options={pageOptions('Updates')} />
+        {/* Opened from the bell in Profile's header (the page draws its own Mark all read). */}
+        <Stack.Screen name="notifications" options={pageOptions('Notifications')} />
+        {/* Opened from Profile: Avatar, Name, Email, Password, Delete account. */}
+        <Stack.Screen name="account" options={pageOptions('Account')} />
+        {/* Opened from Profile: Google Calendar's account, Events and Todo sync. */}
+        <Stack.Screen name="calendar" options={pageOptions('Calendar')} />
+        {/* Opened from Account: changing the name, in a sheet just as tall as its field and
+            button. */}
         <Stack.Screen
-          name="updates"
+          name="account-name"
           options={{
             presentation: 'formSheet',
             sheetAllowedDetents: 'fitToContents',
@@ -138,6 +236,8 @@ function Screens() {
             headerShown: false,
           }}
         />
+        {/* Opened from Account: setting or changing the password, on a page of its own. */}
+        <Stack.Screen name="account-password" options={pageOptions('Password')} />
         {/* A todo's details, opened by tapping it in the list. Starts at half height;
             drag up for full screen (for a long description). */}
         <Stack.Screen
@@ -166,12 +266,12 @@ function Screens() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   root: {
     flex: 1,
   },
   loading: {
     flex: 1,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.page,
   },
-});
+}));

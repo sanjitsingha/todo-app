@@ -1,17 +1,10 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  View,
-  type LayoutChangeEvent,
-  type ScrollViewInstance,
-} from 'react-native';
+import { Animated, Pressable, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
 import { DAY_BOX_RADIUS, DAY_BOX_SIZE } from '@/components/DateStrip';
-import { colors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useSnapStrip } from '@/hooks/useSnapStrip';
 
 const ITEM_WIDTH = 52;
@@ -44,6 +37,7 @@ type Props = {
  * Horizontal on purpose: a vertical wheel would fight the sheet's own up / down drag.
  */
 export function PickerStrip({ items, value, onChange, accessibilityLabel, isDisabled }: Props) {
+  const styles = useStyles();
   const scrollRef = useRef<ScrollViewInstance>(null);
   const [width, setWidth] = useState(0);
 
@@ -125,6 +119,8 @@ export function PickerStrip({ items, value, onChange, accessibilityLabel, isDisa
  * needed). White matches the sheets the strips sit on.
  */
 function EdgeFade({ side }: { side: 'left' | 'right' }) {
+  const styles = useStyles();
+  const colors = useColors();
   const id = `picker-strip-fade-${side}`;
   // Solid at the outer edge, clear toward the middle.
   const [from, to] = side === 'left' ? [1, 0] : [0, 1];
@@ -163,6 +159,7 @@ const StripItem = memo(function StripItem({
   onPress,
   disabled,
 }: StripItemProps) {
+  const styles = useStyles();
   // How close this value is to the center: 0 = one step away (or more), 1 = centered.
   const animated = useMemo(() => {
     const inputRange = [(index - 1) * step, index * step, (index + 1) * step];
@@ -201,7 +198,7 @@ const StripItem = memo(function StripItem({
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   // Fixed height, so nothing jumps while the width is being measured.
   container: {
     height: STRIP_HEIGHT,
@@ -243,4 +240,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-});
+}));

@@ -1,7 +1,6 @@
 import { useIsFocused } from 'expo-router';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import {
-  StyleSheet,
   View,
   type LayoutChangeEvent,
   type NativeScrollEvent,
@@ -19,7 +18,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { G, Rect } from 'react-native-svg';
 
-import { colors } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
+import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useNow } from '@/hooks/useNow';
 import {
   WEEKDAYS,
@@ -112,10 +112,11 @@ const textWidth = (text: string) => text.length * KIT.charWidth;
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
 /**
- * The app's colors on Chart Kit's iPhone-style ("cupertino") look, with no background. While a
- * column is picked, the numbers and names turn a lighter gray along with the other columns.
+ * The app's colors (`colors`) on Chart Kit's iPhone-style ("cupertino") look, with no
+ * background. While a column is picked, the numbers and names turn a lighter gray along with
+ * the other columns.
  */
-const chartTheme = (faded: boolean) => {
+const chartTheme = (faded: boolean, colors: ThemeColors) => {
   const labels = faded ? colors.textSubtle : colors.textMuted;
   return {
     background: 'transparent',
@@ -224,7 +225,7 @@ function GrowingColumn({ x, width, baselineY, height, fill, opacity, grow }: Gro
 
 /**
  * How many todos were written over the range (`range`), as columns, drawn with Chart Kit
- * (react-native-chart-kit) in the iPhone style: yellow (primary) columns rounded at every
+ * (react-native-chart-kit) in the iPhone style: orange (primary) columns rounded at every
  * corner, with no lines behind them, the counts up the side and the hours or days along the
  * bottom.
  *
@@ -242,13 +243,15 @@ function GrowingColumn({ x, width, baselineY, height, fill, opacity, grow }: Gro
  * so does switching to another range.
  */
 export function TodosWrittenChart({ range }: { range: ChartRange }) {
+  const colors = useColors();
+  const styles = useStyles();
   const columns = useTodosWritten(range);
   const [width, setWidth] = useState(0);
   // Which column is picked (0 = the oldest), if one is, and in which range: it doesn't carry
   // over to another range.
   const [picked, setPicked] = useState<{ range: ChartRange; index: number } | null>(null);
   const pickedIndex = picked?.range === range ? picked.index : null;
-  const theme = useMemo(() => chartTheme(pickedIndex !== null), [pickedIndex]);
+  const theme = useMemo(() => chartTheme(pickedIndex !== null, colors), [pickedIndex, colors]);
   // How far apart the columns are, once pinched; each range starts out unzoomed.
   const [zoom, setZoom] = useState<{ range: ChartRange; step: number } | null>(null);
 
@@ -474,7 +477,7 @@ export function TodosWrittenChart({ range }: { range: ChartRange }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   scale: {
     position: 'absolute',
     top: 0,
@@ -484,4 +487,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     pointerEvents: 'none',
   },
-});
+}));

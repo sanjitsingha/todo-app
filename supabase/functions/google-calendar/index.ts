@@ -8,6 +8,11 @@
  * - `sync`: sends the todos changed since the last sync (up to BATCH_SIZE a call; `more` says
  *   to call again). The app calls it after its own sync with Supabase, so it sees what's there.
  * - `disconnect`: stops, and hands the access back to Google. The calendar stays in Google.
+ * - `resync`: sends every todo again, from the start (the following `sync` calls do it).
+ * - `settings`: `{ syncTodos?, showEvents? }`, the Calendar page's switches.
+ * - `events`: `{ from, to }`, the person's events in their primary calendar between two times,
+ *   when Events is on (read-only; needs the events permission, asked for by `connect` with
+ *   `withEvents`).
  *
  * Google sends the browser back to GET /google-calendar/callback (no user token there; the
  * one-time `state` says who it is), which saves the tokens, makes the calendar, and sends the
@@ -32,6 +37,15 @@ const CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
  * on the calendars this app made. It can't see or touch the person's other calendars.
  */
 const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.app.created';
+/**
+ * Reading the person's own events, for the Calendar page's Events switch. Read-only, and only
+ * asked for when Events is first turned on.
+ */
+const EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events.readonly';
+/** Most events one `events` call gives back. */
+const MAX_EVENTS = 500;
+/** The widest window `events` reads, in days. */
+const MAX_EVENT_DAYS = 120;
 
 const CALENDAR_NAME = 'Dooist';
 const CALENDAR_DESCRIPTION =
@@ -116,6 +130,9 @@ type ConnectionRow = {
   synced_until_id: string | null;
   fresh_calendar: boolean;
   last_error: string | null;
+  sync_todos: boolean;
+  show_events: boolean;
+  can_read_events: boolean;
 };
 
 type TokenRow = {
@@ -130,6 +147,7 @@ type StateRow = {
   user_id: string;
   redirect_to: string;
   time_zone: string;
+  with_events: boolean;
   created_at: string;
 };
 
@@ -399,11 +417,14 @@ async function connect(userId: string, body: Record<string, unknown>) {
   // One connect at a time: starting again forgets an unfinished one.
   await db().from('google_oauth_states').delete().eq('user_id', userId);
   const state = randomState();
+  // From the Events switch: ask to read events too.
+  const withEvents = body.withEvents === true;
   const { error } = await db().from('google_oauth_states').insert({
     state,
     user_id: userId,
     redirect_to: redirectTo,
     time_zone: validTimeZone(body.timeZone),
+    with_events: withEvents,
   });
   if (error) throw error;
 
@@ -412,7 +433,7 @@ async function connect(userId: string, body: Record<string, unknown>) {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: CALLBACK_URL,
     response_type: 'code',
-    scope: ['openid', 'email', CALENDAR_SCOPE].join(' '),
+    scope: ['openid', 'email', CALENDAR_SCOPE, ...(withEvents ? [EVENTS_SCOPE] : [])].join(' '),
     // A refresh token, so todos can be sent long after this, and the consent screen every
     // time, so Google gives a new one even to someone who connected before.
     access_type: 'offline',
@@ -439,11 +460,18 @@ async function callback(url: URL): Promise<Response> {
     return note('This link has expired. Go back to Dooist and try connecting again.');
   }
 
+  // Filled in once Google answers; `back` mentions it when events were asked for.
+  let canReadEvents = false;
+
   /** On to the app, saying how it went. */
   const back = (outcome: 'connected' | 'cancelled' | 'error', reason?: string) => {
     const target = new URL(pending.redirect_to);
     target.searchParams.set('calendar', outcome);
     if (reason) target.searchParams.set('reason', reason);
+    // Asked to read events, and Google's box for it was left unticked.
+    if (outcome === 'connected' && pending.with_events && !canReadEvents) {
+      target.searchParams.set('events', 'denied');
+    }
     return new Response(null, { status: 302, headers: { Location: target.toString() } });
   };
 
@@ -462,7 +490,9 @@ async function callback(url: URL): Promise<Response> {
     return back('error', 'exchange');
   }
   // Google lets people untick the Calendar permission on the consent screen.
-  if (!(tokens.scope ?? '').split(' ').includes(CALENDAR_SCOPE)) return back('error', 'scope');
+  const granted = (tokens.scope ?? '').split(' ');
+  if (!granted.includes(CALENDAR_SCOPE)) return back('error', 'scope');
+  canReadEvents = granted.includes(EVENTS_SCOPE);
   if (!tokens.refresh_token) return back('error', 'no_refresh_token');
 
   const { data: existing } = await db()
@@ -495,7 +525,9 @@ async function callback(url: URL): Promise<Response> {
     });
   if (saved.error) throw saved.error;
 
-  // Starts sending from the beginning: every todo goes (again) to the calendar.
+  // Starts sending from the beginning: every todo goes (again) to the calendar. The switches
+  // keep what they were, except that connecting from the Events switch turns Events on once
+  // reading events is allowed.
   const connected = await db().from('calendar_connections').upsert({
     user_id: pending.user_id,
     connected: true,
@@ -506,6 +538,8 @@ async function callback(url: URL): Promise<Response> {
     synced_until_id: null,
     fresh_calendar: calendar.fresh,
     last_error: null,
+    can_read_events: canReadEvents,
+    ...(pending.with_events ? { show_events: canReadEvents } : {}),
   });
   if (connected.error) throw connected.error;
 
@@ -577,6 +611,8 @@ async function sync(userId: string) {
   if (!connection?.connected || !connection.calendar_id) {
     return { connected: false, reason: connection?.last_error ?? null };
   }
+  // Todo sync is off: nothing new goes to Google, and what's there stays.
+  if (!connection.sync_todos) return { connected: true, more: false };
 
   let token: string;
   try {
@@ -658,10 +694,138 @@ async function disconnect(userId: string) {
       synced_until: null,
       synced_until_id: null,
       fresh_calendar: false,
+      // The access is handed back, so reading events goes with it.
+      can_read_events: false,
+      show_events: false,
     })
     .eq('user_id', userId);
   if (saved.error) throw saved.error;
   return { connected: false };
+}
+
+/** Sends every todo again, from the start: the next `sync` calls do the sending. */
+async function resync(userId: string) {
+  const saved = await db()
+    .from('calendar_connections')
+    .update({ synced_until: null, synced_until_id: null })
+    .eq('user_id', userId)
+    .eq('connected', true);
+  if (saved.error) throw saved.error;
+  return { ok: true };
+}
+
+/**
+ * The Calendar page's switches. Turning Todo sync back on sends everything again. Turning
+ * Events on needs the permission to read events first: without it, this says so
+ * (`needs_permission`) and the app connects again, asking for it.
+ */
+async function settings(userId: string, body: Record<string, unknown>) {
+  const { data, error } = await db()
+    .from('calendar_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  const connection = data as ConnectionRow | null;
+  if (!connection?.connected) return { error: 'not_connected' };
+
+  const update: Record<string, unknown> = {};
+  if (typeof body.syncTodos === 'boolean' && body.syncTodos !== connection.sync_todos) {
+    update.sync_todos = body.syncTodos;
+    if (body.syncTodos) {
+      update.synced_until = null;
+      update.synced_until_id = null;
+    }
+  }
+  if (typeof body.showEvents === 'boolean') {
+    if (body.showEvents && !connection.can_read_events) return { error: 'needs_permission' };
+    update.show_events = body.showEvents;
+  }
+  if (Object.keys(update).length > 0) {
+    const saved = await db().from('calendar_connections').update(update).eq('user_id', userId);
+    if (saved.error) throw saved.error;
+  }
+  return { ok: true };
+}
+
+type GoogleEvent = {
+  id?: string;
+  status?: string;
+  summary?: string;
+  location?: string;
+  start?: { date?: string; dateTime?: string };
+  end?: { date?: string; dateTime?: string };
+};
+
+/**
+ * The person's events in their primary Google calendar between `from` and `to` (ISO times),
+ * repeating ones as separate events, for Events in Dooist. Empty when Events is off, with
+ * `reason` saying why when it's not just off.
+ */
+async function events(userId: string, body: Record<string, unknown>) {
+  const from = typeof body.from === 'string' ? Date.parse(body.from) : NaN;
+  const to = typeof body.to === 'string' ? Date.parse(body.to) : NaN;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) {
+    return { error: 'bad_request' };
+  }
+  const until = Math.min(to, from + MAX_EVENT_DAYS * 24 * 60 * 60 * 1000);
+
+  const { data, error } = await db()
+    .from('calendar_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  const connection = data as ConnectionRow | null;
+  if (!connection?.connected) return { events: [], reason: connection?.last_error ?? 'not_connected' };
+  if (!connection.show_events) return { events: [] };
+  if (!connection.can_read_events) return { events: [], reason: 'needs_permission' };
+
+  let token: string;
+  try {
+    token = await accessToken(userId);
+  } catch (refreshError) {
+    if (refreshError instanceof RevokedError) return { events: [], reason: 'revoked' };
+    throw refreshError;
+  }
+
+  const query = new URLSearchParams({
+    timeMin: new Date(from).toISOString(),
+    timeMax: new Date(until).toISOString(),
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: String(MAX_EVENTS),
+    fields: 'items(id,status,summary,location,start,end)',
+  });
+  const response = await calendarFetch(token, `/calendars/primary/events?${query}`, 'GET');
+  if (response.status === 401 || response.status === 403) {
+    // The permission was taken back (or never covered this): Events goes off until it's given.
+    await drop(response);
+    await db()
+      .from('calendar_connections')
+      .update({ can_read_events: false, show_events: false })
+      .eq('user_id', userId);
+    return { events: [], reason: 'needs_permission' };
+  }
+  if (!response.ok) throw new Error(`events.list ${response.status}: ${await response.text()}`);
+
+  const items = ((await response.json()) as { items?: GoogleEvent[] }).items ?? [];
+  return {
+    events: items
+      .filter((item) => item.id && item.status !== 'cancelled' && (item.start?.date || item.start?.dateTime))
+      .map((item) => {
+        const allDay = Boolean(item.start?.date);
+        return {
+          id: item.id,
+          title: item.summary?.trim() || '(No title)',
+          location: item.location ?? null,
+          allDay,
+          // All day: "YYYY-MM-DD", the end day not included. Otherwise ISO times with offsets.
+          start: allDay ? item.start?.date : item.start?.dateTime,
+          end: allDay ? (item.end?.date ?? item.start?.date) : (item.end?.dateTime ?? item.start?.dateTime),
+        };
+      }),
+  };
 }
 
 // Entry --------------------------------------------------------------------------------
@@ -692,6 +856,12 @@ Deno.serve(async (req) => {
         return json(await sync(userId));
       case 'disconnect':
         return json(await disconnect(userId));
+      case 'resync':
+        return json(await resync(userId));
+      case 'settings':
+        return json(await settings(userId, body));
+      case 'events':
+        return json(await events(userId, body));
       default:
         return json({ error: 'bad_request' }, 400);
     }

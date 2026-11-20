@@ -1,12 +1,15 @@
 import { memo, useMemo } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 
 import { CompletedSection } from '@/components/CompletedSection';
+import { DayEvents } from '@/components/DayEvents';
 import { ScreenPlaceholder } from '@/components/ScreenPlaceholder';
 import { TodoItem } from '@/components/TodoItem';
 import { TodoTimeline } from '@/components/TodoTimeline';
 import { formatDayPhrase, type DateKey } from '@/lib/dates';
+import { useAuth } from '@/store/auth';
+import { useDayEvents } from '@/store/calendarEvents';
 import { useTodos, type Todo } from '@/store/todos';
 
 // Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
@@ -46,10 +49,14 @@ type Props = {
 
 /**
  * One day's todos, as a list of cards or as a timeline: a page of the day pager
- * (src/components/DayPager.tsx).
+ * (src/components/DayPager.tsx). With Events on (the Calendar page), the day's Google Calendar
+ * events sit above them.
  */
 export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Props) {
   const { pendingTodos, completedTodos } = useDayTodos(date);
+  const { user } = useAuth();
+  const events = useDayEvents(date, user?.id ?? null);
+  const eventsHeader = events.length > 0 ? <DayEvents events={events} date={date} /> : null;
 
   // The cards: unfinished todos in the list, finished ones in a Completed section below it.
   const showCompletedSection = completedTodos.length > 0;
@@ -61,9 +68,18 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
     [pendingTodos, completedTodos],
   );
 
-  if (showTimeline) return <TodoTimeline todos={timelineTodos} date={date} />;
+  if (showTimeline) {
+    if (!eventsHeader) return <TodoTimeline todos={timelineTodos} date={date} />;
+    return (
+      <View style={styles.fill}>
+        <View style={styles.timelineEvents}>{eventsHeader}</View>
+        <TodoTimeline todos={timelineTodos} date={date} />
+      </View>
+    );
+  }
 
-  if (isEmpty) {
+  // No todos, and no events either.
+  if (isEmpty && !eventsHeader) {
     return (
       <ScreenPlaceholder
         icon="list-outline"
@@ -78,6 +94,7 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
       data={pendingTodos}
       keyExtractor={keyExtractor}
       renderItem={renderTodo}
+      ListHeaderComponent={eventsHeader ?? undefined}
       ListFooterComponent={
         showCompletedSection ? <CompletedSection todos={completedTodos} /> : undefined
       }
@@ -88,6 +105,13 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
 });
 
 const styles = StyleSheet.create({
+  fill: {
+    flex: 1,
+  },
+  // The list has its own room at the top; above the timeline, the events need some.
+  timelineEvents: {
+    paddingTop: 12,
+  },
   // A little room between the date strip and the first todo card.
   list: {
     paddingTop: 12,

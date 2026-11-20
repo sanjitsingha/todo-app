@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '@/constants/theme';
+import { useColors } from '@/hooks/useTheme';
 
 /**
  * Log in sits at the bottom of these screens (anchored), so it's what signing out, or opening
@@ -16,11 +16,12 @@ export const unstable_settings = {
  * in, which has nothing behind it (src/components/auth/AuthScreen.tsx).
  */
 export default function AuthLayout() {
+  const colors = useColors();
   return (
     <Stack
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.surface },
+        contentStyle: { backgroundColor: colors.page },
       }}
     />
   );

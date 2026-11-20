@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 
-import { colors } from '@/constants/theme';
+import { createThemedStyles } from '@/hooks/useTheme';
 
 type Props = {
   /** The digits typed so far. */
@@ -23,6 +23,7 @@ type Props = {
  * keyboard's suggestion from the email fills every box at once.
  */
 export function OtpInput({ value, onChangeText, length, onComplete, label, autoFocus }: Props) {
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   // The box being typed in: the first empty one, or the last once they're all filled.
   const current = Math.min(value.length, length - 1);
@@ -64,7 +65,7 @@ export function OtpInput({ value, onChangeText, length, onComplete, label, autoF
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = createThemedStyles((colors) => ({
   row: {
     flexDirection: 'row',
     gap: 8,
@@ -101,4 +102,4 @@ const styles = StyleSheet.create({
     outlineStyle: 'solid',
     outlineWidth: 0,
   },
-});
+}));

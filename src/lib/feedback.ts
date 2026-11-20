@@ -6,10 +6,16 @@ import { getSettings } from '@/store/settings';
 
 const TICK_SOUND = require('../../assets/sounds/tick.wav');
 
-// A fast swipe can tick again before the last tick has finished playing, so ticks take turns
-// across a few players instead of cutting one off mid-sound.
-const PLAYER_COUNT = 3;
-let players: AudioPlayer[] = [];
+// A fast swipe ticks again and again, so ticks take turns across a few players. Each one
+// rewinds a moment after it plays (the tick is 35 ms long), so it's back at the start, ready,
+// by its next turn. Rewinding just before playing instead (seekTo, then play) could start the
+// sound before the rewind landed, from the end: a silent tick, often, on a fast swipe.
+const PLAYER_COUNT = 6;
+/** Long enough for the 35 ms tick to finish before its player rewinds. */
+const REWIND_AFTER_MS = 60;
+
+type TickPlayer = { player: AudioPlayer; ready: boolean };
+let players: TickPlayer[] = [];
 let nextPlayer = 0;
 
 /**
@@ -26,8 +32,8 @@ function syncPlayers() {
     setAudioModeAsync({ interruptionMode: 'mixWithOthers', playsInSilentMode: false }).catch(
       () => {},
     );
-    players = Array.from({ length: PLAYER_COUNT }, () =>
-      createAudioPlayer(TICK_SOUND, {
+    players = Array.from({ length: PLAYER_COUNT }, () => ({
+      player: createAudioPlayer(TICK_SOUND, {
         // Play from a copy on the device. In development the sound otherwise streams from the
         // dev server (through the tunnel, even), and a rewind can wait on the network.
         downloadFirst: true,
@@ -35,10 +41,11 @@ function syncPlayers() {
         // makes every tick late.
         keepAudioSessionActive: true,
       }),
-    );
+      ready: true,
+    }));
     nextPlayer = 0;
   } else if (!usesSound && players.length > 0) {
-    players.forEach((player) => player.remove());
+    players.forEach(({ player }) => player.remove());
     players = [];
   }
 }
@@ -46,15 +53,27 @@ function syncPlayers() {
 // Load the sound up front, so the first tick isn't late.
 syncPlayers();
 
+/** Plays the tick on the next player that's back at the start. None ready: skips it, rather than tick late. */
 function playTickSound() {
-  const player = players[nextPlayer];
-  if (!player) return;
-  nextPlayer = (nextPlayer + 1) % players.length;
-  try {
-    player.seekTo(0).catch(() => {});
-    player.play();
-  } catch {
-    // A missed tick is not worth crashing over.
+  for (let tried = 0; tried < players.length; tried++) {
+    const entry = players[nextPlayer];
+    nextPlayer = (nextPlayer + 1) % players.length;
+    if (!entry?.ready) continue;
+    entry.ready = false;
+    try {
+      entry.player.play();
+    } catch {
+      // A missed tick is not worth crashing over.
+    }
+    setTimeout(() => {
+      entry.player
+        .seekTo(0)
+        .catch(() => {})
+        .finally(() => {
+          entry.ready = true;
+        });
+    }, REWIND_AFTER_MS);
+    return;
   }
 }
 
