@@ -15,8 +15,8 @@ import {
 } from '@/lib/dates';
 
 type Props = {
-  /** The picked day. The calendar opens on its month. */
-  value: DateKey;
+  /** The picked day. The calendar opens on its month, or on today's when none is picked. */
+  value: DateKey | null;
   /** Gets the orange dot, like in the date strip. */
   today: DateKey;
   /** Days before this are greyed out and can't be picked. */
@@ -28,7 +28,7 @@ type Props = {
 export function Calendar({ value, today, minDate, onSelect }: Props) {
   const styles = useStyles();
   // The 1st of the month on screen.
-  const [month, setMonth] = useState(() => startOfMonth(value));
+  const [month, setMonth] = useState(() => startOfMonth(value ?? today));
   const canGoBack = !minDate || month > startOfMonth(minDate);
   const weeks = getMonthGrid(month);
 

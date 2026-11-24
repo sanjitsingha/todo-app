@@ -10,6 +10,7 @@ import {
   PrimaryButton,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
+import { AuthLogo } from '@/components/auth/AuthLogo';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { isEmail, MIN_PASSWORD_LENGTH, passwordProblem } from '@/lib/validation';
 import { signUp } from '@/store/auth';
@@ -51,6 +52,7 @@ export default function RegisterScreen() {
     return (
       <AuthScreen
         split
+        top={<AuthLogo />}
         title="Check your email"
         subtitle={`We sent a link to ${email.trim()}. Open it to confirm, then log in.`}
       >
@@ -61,9 +63,10 @@ export default function RegisterScreen() {
 
   return (
     <AuthScreen
-      // Top 60% left empty for now, like the login screen; the form takes the bottom 40%, and
-      // more when it needs it.
+      // The Dooist mark in the middle of the orange top 60%, like the login screen; the form
+      // takes the bottom 40%, and more when it needs it.
       split
+      top={<AuthLogo />}
       title="Create your account"
       footer={
         <FooterPrompt prompt="Already have an account?" action="Log in" onPress={goToLogIn} />

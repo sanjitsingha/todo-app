@@ -29,7 +29,7 @@ type Props<T extends string> = {
 };
 
 /** A round radio button: an empty ring, or a ring with a dot in it when picked. */
-function Radio({ selected }: { selected: boolean }) {
+export function Radio({ selected }: { selected: boolean }) {
   const styles = useStyles();
   return (
     <View style={[styles.radio, selected && styles.radioSelected]}>

@@ -77,9 +77,9 @@ const CHECKBOX_SIZE = 18;
 const CHECKBOX_RADIUS = 5;
 // Centers the checkbox on the title's first line.
 const CHECKBOX_MARGIN = (TITLE_LINE_HEIGHT - CHECKBOX_SIZE) / 2;
-// Nested corners: outer radius = inner radius + the gap between them. The card's corner is
-// worked out from the checkbox's, so the two curves run parallel.
-const CARD_RADIUS = CHECKBOX_RADIUS + CARD_PADDING + CHECKBOX_MARGIN;
+// Tighter than the checkbox's curve carried out to the card's edge (5 + 8 + 3 = 16), for a
+// squarer card. The same as the app's other rounded pieces, like the Completed section header.
+const CARD_RADIUS = 10;
 
 const useStyles = createThemedStyles((colors) => ({
   // Lined up with the 16px edges of the rest of the screen. Tinted by priority while open (see

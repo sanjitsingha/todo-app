@@ -2,7 +2,7 @@
   "expo": {
     "name": "Dooist",
     "slug": "todo-app",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -45,7 +45,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "scheme": "todoapp",
     "experiments": {
@@ -56,10 +57,15 @@
         "projectId": "99e3ec8d-bc4f-4576-9a39-3921efa69e54"
       },
       "release": {
-        "version": "1.1.1",
+        "version": "1.2.0",
         "notes": [
+          "Upcoming: every todo due after today, by day, like on the web.",
+          "Add a todo with the round + button at the bottom right of Today and Upcoming.",
+          "Reporting replaces Stats: a log of the todos you added, updated, completed and deleted, by day, like on the web.",
+          "Filter Reporting by action and date, and download what it shows as a PDF to save or share.",
+          "Integrations in Profile, with ChatGPT coming soon.",
           "A new dark look, built on deep, neutral grays.",
-          "The Dooist orange on buttons, checkboxes and the Stats chart, and on today's date in the date strip.",
+          "The Dooist orange on buttons and checkboxes, and on today's date in the date strip.",
           "Calendar: connect Google Calendar, see your Google events in Today, and switch todo sync on or off.",
           "Account: see your picture and email, change your name, set a password, or delete your account.",
           "Notifications: tap the bell at the top of Profile.",

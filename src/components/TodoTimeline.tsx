@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN, scheduleOnUI } from 'react-native-worklets';
 
+import { FAB_CLEARANCE } from '@/components/AddTodoFab';
 import { priorityOf } from '@/components/TodoChips';
 import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useNow } from '@/hooks/useNow';
@@ -510,9 +511,10 @@ const useStyles = createThemedStyles((colors) => ({
   allDayContent: {
     gap: 4,
   },
-  // Room below 11 pm for a block that starts late to run past midnight.
+  // Room below 11 pm for a block that starts late to run past midnight, and for the last hours
+  // to scroll up clear of the Add todo button.
   gridContent: {
-    paddingBottom: 64,
+    paddingBottom: FAB_CLEARANCE,
   },
   // A label centered on its time's line; moved down to it with a transform.
   tickRow: {

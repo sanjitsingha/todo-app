@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
 
+import { FAB_CLEARANCE } from '@/components/AddTodoFab';
 import { CompletedSection } from '@/components/CompletedSection';
 import { DayEvents } from '@/components/DayEvents';
 import { ScreenPlaceholder } from '@/components/ScreenPlaceholder';
@@ -10,17 +11,7 @@ import { TodoTimeline } from '@/components/TodoTimeline';
 import { formatDayPhrase, type DateKey } from '@/lib/dates';
 import { useAuth } from '@/store/auth';
 import { useDayEvents } from '@/store/calendarEvents';
-import { useTodos, type Todo } from '@/store/todos';
-
-// Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
-const UNTIMED = '~';
-
-function compareTodos(a: Todo, b: Todo): number {
-  const timeA = a.dueTime ?? UNTIMED;
-  const timeB = b.dueTime ?? UNTIMED;
-  if (timeA !== timeB) return timeA < timeB ? -1 : 1;
-  return a.createdAt - b.createdAt;
-}
+import { compareTodos, useTodos, type Todo } from '@/store/todos';
 
 /**
  * The todos due on a day, split by status. Ones with a time come first, earliest first; the
@@ -112,9 +103,10 @@ const styles = StyleSheet.create({
   timelineEvents: {
     paddingTop: 12,
   },
-  // A little room between the date strip and the first todo card.
+  // A little room between the date strip and the first todo card, and room at the end for the
+  // last one to scroll up clear of the Add todo button.
   list: {
     paddingTop: 12,
-    paddingBottom: 16,
+    paddingBottom: FAB_CLEARANCE,
   },
 });

@@ -1,13 +1,12 @@
-import { useRouter } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/tabs';
 // Just these icons, not the whole icon set.
-import ChartPie from 'lucide-react-native/icons/chart-pie';
-import CirclePlus from 'lucide-react-native/icons/circle-plus';
+import CalendarClock from 'lucide-react-native/icons/calendar-clock';
+import FileChartColumn from 'lucide-react-native/icons/file-chart-column';
 import LayoutList from 'lucide-react-native/icons/layout-list';
 import StickyNote from 'lucide-react-native/icons/sticky-note';
 import UserRound from 'lucide-react-native/icons/user-round';
 import type { ReactNode } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { FEATURES } from '@/constants/features';
 import { createThemedStyles, useColors } from '@/hooks/useTheme';
@@ -30,9 +29,14 @@ const TABS = {
     label: 'Today',
     renderIcon: (color) => <LayoutList size={TAB_ICON_SIZE} color={color} />,
   },
-  stats: {
-    label: 'Stats',
-    renderIcon: (color) => <ChartPie size={TAB_ICON_SIZE} color={color} />,
+  // The web app's Upcoming and Reporting icons.
+  upcoming: {
+    label: 'Upcoming',
+    renderIcon: (color) => <CalendarClock size={TAB_ICON_SIZE} color={color} />,
+  },
+  reporting: {
+    label: 'Reporting',
+    renderIcon: (color) => <FileChartColumn size={TAB_ICON_SIZE} color={color} />,
   },
   sticky: {
     label: 'Sticky',
@@ -48,14 +52,14 @@ type TabName = keyof typeof TABS;
 
 /**
  * Bottom navbar, evenly spaced, each an icon with its name under it: Today (the Todo screen),
- * Add Todo, Stats, Sticky (the sticky note wall, while it's hidden: see FEATURES), and Profile.
- * The open tab is dark, the rest gray. Add Todo is not a tab: a plain button like the tabs
- * around it, in their gray, that opens the Add todo sheet above the current tab.
+ * Upcoming, Reporting, Sticky (the sticky note wall, while it's hidden: see FEATURES), and
+ * Profile. Today, Upcoming and Reporting are the web app's pages, in its order. The open tab is
+ * dark, the rest gray. Adding a todo is the round button floating over Today and Upcoming
+ * (src/components/AddTodoFab.tsx).
  */
 export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTabBarProps) {
   const styles = useStyles();
   const colors = useColors();
-  const router = useRouter();
 
   const renderTab = (name: TabName) => {
     const index = state.routes.findIndex((route) => route.name === name);
@@ -92,26 +96,8 @@ export function BottomNavBar({ state, emitter, navigateToTab, insets }: BottomTa
     <View style={[styles.bar, { paddingBottom: insets.bottom }]}>
       <View style={styles.row}>
         {renderTab('index')}
-
-        <Pressable
-          onPress={() => router.push('/add')}
-          style={styles.tab}
-          android_ripple={{ color: colors.ripple, borderless: true, radius: 28 }}
-          accessibilityRole="button"
-          accessibilityLabel="Add todo"
-        >
-          {/* Android shows a ripple; iOS dims the icon and name while pressed. */}
-          {({ pressed }) => (
-            <View
-              style={[styles.content, pressed && Platform.OS !== 'android' && styles.pressed]}
-            >
-              <CirclePlus size={TAB_ICON_SIZE} color={colors.iconInactive} />
-              <Text style={styles.label}>Add Todo</Text>
-            </View>
-          )}
-        </Pressable>
-
-        {renderTab('stats')}
+        {renderTab('upcoming')}
+        {renderTab('reporting')}
         {FEATURES.sticky ? renderTab('sticky') : null}
         {renderTab('profile')}
       </View>
@@ -137,13 +123,6 @@ const useStyles = createThemedStyles((colors) => ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: LABEL_GAP,
-  },
-  content: {
-    alignItems: 'center',
-    gap: LABEL_GAP,
-  },
-  pressed: {
-    opacity: 0.5,
   },
   label: {
     fontSize: 12,

@@ -20,7 +20,7 @@ const light = {
   pageHeader: '#FFFFFF',
   /**
    * The header of a gray page: the Todo screen's date header and strip (and the status bar
-   * above them), and Stats.
+   * above them).
    */
   headerBackground: '#F8FAFC',
   /** Behind the day's todos, below the date strip. */
@@ -37,8 +37,11 @@ const light = {
   danger: '#DC2626',
   /** Green for "all done", like the full goal ring. */
   success: '#16A34A',
-  /** A deeper green, for text: the On time count on the Stats tab. */
-  successDark: '#15803D',
+  /**
+   * Icons on the strong fills (`success`, `skyDark`, `amberDark`, `danger`) of the Reporting
+   * tab's action badges. Dark in the dark look, where those fills turn light.
+   */
+  onStatus: '#FFFFFF',
   /** Tinted backgrounds and their text colors, used for the priority options and date chips. */
   dangerSoft: '#FEE2E2',
   amberSoft: '#FEF3C7',
@@ -125,7 +128,7 @@ export const darkColors: ThemeColors = {
   iconInactive: '#71717A',
   danger: '#F87171',
   success: '#22C55E',
-  successDark: '#4ADE80',
+  onStatus: '#0E0E10',
   dangerSoft: '#3A1D24',
   amberSoft: '#3A2C12',
   amberDark: '#FBBF24',

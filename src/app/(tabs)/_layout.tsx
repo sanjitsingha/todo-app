@@ -10,8 +10,8 @@ import { useColors } from '@/hooks/useTheme';
 import { useSelectedDate } from '@/store/selectedDate';
 
 /**
- * The bottom navbar, plus a rule for the tabs as a whole: going to another tab (Stats, Sticky,
- * Profile) puts the date strip back on today, so the Todo tab always comes back to today.
+ * The bottom navbar, plus a rule for the tabs as a whole: going to another tab (Upcoming,
+ * Reporting, Sticky, Profile) puts the date strip back on today, so the Todo tab always comes back to today.
  * Sheets opened on top of the Todo tab (add, todo details) aren't tabs, so they keep the day
  * you were on. It's done on the way out, so the strip is already on today when the Todo tab
  * shows again.
@@ -58,7 +58,10 @@ export default function TabsLayout() {
     >
       {/* The Todo screen draws its own date header (src/components/DateHeader.tsx). */}
       <Tabs.Screen name="index" options={{ title: 'Today', headerShown: false }} />
-      <Tabs.Screen name="stats" options={{ title: 'Stats', ...grayPage }} />
+      {/* Every open todo due after today, by day, as on the web app, on a white page. */}
+      <Tabs.Screen name="upcoming" options={{ title: 'Upcoming', ...page }} />
+      {/* A log of what happened to your todos, as on the web app, on a white page. */}
+      <Tabs.Screen name="reporting" options={{ title: 'Reporting', ...page }} />
       {/* A dotted wall of sticky notes, on the same light gray. Hidden for now: no tab in the
           bar until FEATURES.sticky is turned on. */}
       <Tabs.Screen name="sticky" options={{ title: 'Sticky', ...grayPage }} />

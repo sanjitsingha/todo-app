@@ -22,8 +22,9 @@ export type Todo = {
   priority: Priority;
   completed: boolean;
   /**
-   * When it was marked done, while it is, for the Stats tab's On time card. Set on every done
-   * todo: ones finished before this was noted get one when loaded (see assumedFinishTime).
+   * When it was marked done, while it is, for the Reporting tab's log (and the account's
+   * `completed_at`). Set on every done todo: ones finished before this was noted get one when
+   * loaded (see assumedFinishTime).
    */
   completedAt?: number;
   createdAt: number;
@@ -45,6 +46,20 @@ export type NewTodo = Pick<
 
 function isPriority(value: unknown): value is Priority {
   return value === 'high' || value === 'medium' || value === 'low';
+}
+
+// Comes after every "HH:mm" time in a plain string comparison, so todos without a time go last.
+const UNTIMED = '~';
+
+/**
+ * The order of a day's todos, in its list (src/components/DayTodos.tsx) and on Upcoming: ones
+ * with a time first, earliest first, then the rest in the order they were added.
+ */
+export function compareTodos(a: Todo, b: Todo): number {
+  const timeA = a.dueTime ?? UNTIMED;
+  const timeB = b.dueTime ?? UNTIMED;
+  if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+  return a.createdAt - b.createdAt;
 }
 
 /** What can be changed on a saved todo. A key set to undefined clears that value. */
@@ -221,7 +236,7 @@ function deleteTodo(id: string) {
   updateTodos((current) => current.filter((candidate) => candidate.id !== id));
 }
 
-// Marking a todo done notes when, for the Stats tab's On time card; undoing it clears that.
+// Marking a todo done notes when, for the Reporting tab's log; undoing it clears that.
 function toggleTodo(id: string) {
   const now = Date.now();
   updateTodos((current) =>

@@ -224,6 +224,9 @@ function Screens() {
         <Stack.Screen name="account" options={pageOptions('Account')} />
         {/* Opened from Profile: Google Calendar's account, Events and Todo sync. */}
         <Stack.Screen name="calendar" options={pageOptions('Calendar')} />
+        {/* Opened from Profile: other apps Dooist works with, like the web app's
+            Integrations (ChatGPT, coming soon). */}
+        <Stack.Screen name="integrations" options={pageOptions('Integrations')} />
         {/* Opened from Account: changing the name, in a sheet just as tall as its field and
             button. */}
         <Stack.Screen
@@ -245,6 +248,30 @@ function Screens() {
           options={{
             presentation: 'formSheet',
             sheetAllowedDetents: [0.5, 1],
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+            headerShown: false,
+          }}
+        />
+        {/* Opened from the Reporting tab's Actions filter: a checkbox for each action. Just
+            as tall as its rows. */}
+        <Stack.Screen
+          name="report-actions"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+            headerShown: false,
+          }}
+        />
+        {/* Opened from the Reporting tab's Date filter: ranges, then a calendar. Starts at
+            85% height, like the due-date sheet, which shows it all; drag up for full screen. */}
+        <Stack.Screen
+          name="report-date"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: [0.85, 1],
             sheetGrabberVisible: true,
             sheetCornerRadius: 24,
             headerShown: false,

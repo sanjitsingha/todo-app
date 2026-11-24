@@ -11,6 +11,7 @@ import {
   TextLink,
 } from '@/components/auth/AuthButtons';
 import { AuthField } from '@/components/auth/AuthField';
+import { AuthLogo } from '@/components/auth/AuthLogo';
 import { AuthScreen } from '@/components/auth/AuthScreen';
 import { isEmail } from '@/lib/validation';
 import { logIn } from '@/store/auth';
@@ -42,8 +43,10 @@ export default function LoginScreen() {
 
   return (
     <AuthScreen
-      // Top 60% left empty for now; the form takes the bottom 40%, and more when it needs it.
+      // The Dooist mark in the middle of the orange top 60%; the form takes the bottom 40%, and
+      // more when it needs it.
       split
+      top={<AuthLogo />}
       showBack={false}
       title="Log in to your account"
       footer={

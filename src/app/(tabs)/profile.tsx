@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useUpdates } from 'expo-updates';
 // Just these icons, not the whole icon set.
-import Bot from 'lucide-react-native/icons/bot';
+import Blocks from 'lucide-react-native/icons/blocks';
 import CalendarSync from 'lucide-react-native/icons/calendar-sync';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleUserRound from 'lucide-react-native/icons/circle-user-round';
@@ -114,11 +114,12 @@ function CalendarRow({ userId }: { userId: string }) {
 
 /**
  * The Profile tab: the app's settings and accounts, top to bottom: Account, Haptic Feedback,
- * Appearance, Check for Updates, Calendar, Connect ChatGPT, Privacy Policy, then Log Out
- * (signing in is required, so someone always is). Account and Check for Updates open pages of
- * their own (src/app/account.tsx, src/app/updates.tsx); Haptic Feedback and Appearance open
- * bottom sheets (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Calendar opens its page
- * (src/app/calendar.tsx); the rest are in place for what comes next. The bell in the header opens
+ * Appearance, Check for Updates, Calendar, Integrations, Privacy Policy, then Log Out (signing
+ * in is required, so someone always is). Account and Check for Updates open pages of their own
+ * (src/app/account.tsx, src/app/updates.tsx); Haptic Feedback and Appearance open bottom sheets
+ * (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Calendar and Integrations open their
+ * pages (src/app/calendar.tsx, src/app/integrations.tsx); Privacy Policy is in place for what
+ * comes next. The bell in the header opens
  * Notifications.
  */
 export default function ProfileScreen() {
@@ -146,7 +147,8 @@ export default function ProfileScreen() {
       />
       {/* No one's signed in only for a moment, while logging out moves to the login screen. */}
       {user ? <CalendarRow userId={user.id} /> : null}
-      <Row icon={Bot} title="Connect ChatGPT" />
+      {/* The web app's Integrations icon. */}
+      <Row icon={Blocks} title="Integrations" onPress={() => router.push('/integrations')} />
       <Row icon={ShieldCheck} title="Privacy Policy" />
       <Row icon={LogOut} title="Log Out" destructive accessory={null} onPress={confirmLogOut} />
     </ScrollView>

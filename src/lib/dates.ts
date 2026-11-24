@@ -102,29 +102,24 @@ export function isDateKey(value: unknown): value is DateKey {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-/** "12 Nov" */
-export function formatDayMonth(key: DateKey): string {
-  const date = fromDateKey(key);
-  return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
-}
-
 /** "Wed, 12 Nov" (year added if not this year), never "Today" / "Tomorrow". */
 export function formatShortDate(key: DateKey, now = new Date()): string {
   return absoluteDayLabel(key, now);
 }
 
-/** "10 – 16 Nov", "28 Oct – 3 Nov", or "29 Dec 2026 – 4 Jan 2027" across a new year. */
-export function formatDayRange(from: DateKey, to: DateKey): string {
-  const start = fromDateKey(from);
-  const end = fromDateKey(to);
-  const endLabel = `${end.getDate()} ${MONTHS[end.getMonth()]}`;
-  if (start.getFullYear() !== end.getFullYear()) {
-    return `${start.getDate()} ${MONTHS[start.getMonth()]} ${start.getFullYear()} – ${endLabel} ${end.getFullYear()}`;
-  }
-  if (start.getMonth() !== end.getMonth()) {
-    return `${start.getDate()} ${MONTHS[start.getMonth()]} – ${endLabel}`;
-  }
-  return `${start.getDate()} – ${endLabel}`;
+/**
+ * A day's heading on the Reporting tab: "21 Nov · Today · Saturday", with the year if it isn't
+ * this year. The same as the web app's.
+ */
+export function formatActivityDay(key: DateKey, now = new Date()): string {
+  const date = fromDateKey(key);
+  const year = date.getFullYear() === now.getFullYear() ? '' : ` ${date.getFullYear()}`;
+  const relative = relativeDayLabel(key, now);
+  return [
+    `${date.getDate()} ${MONTHS[date.getMonth()]}${year}`,
+    ...(relative ? [relative] : []),
+    WEEKDAYS_LONG[date.getDay()],
+  ].join(' · ');
 }
 
 /** The coming Saturday, or today if it's already the weekend. */
@@ -223,11 +218,6 @@ export function isTimeKey(value: unknown): value is TimeKey {
 export function formatTime(key: TimeKey): string {
   const { hours, minutes } = parseTimeKey(key);
   return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${hours < 12 ? 'am' : 'pm'}`;
-}
-
-/** An hour of the day (0–23) on its own: "12 am", "6 am", "12 pm". */
-export function formatHour(hours: number): string {
-  return `${hours % 12 || 12} ${hours < 12 ? 'am' : 'pm'}`;
 }
 
 /** "Today, 4:12 pm", or just "Today" when there's no time. */

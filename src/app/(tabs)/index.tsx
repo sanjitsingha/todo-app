@@ -5,6 +5,7 @@ import { startTransition, useCallback, useDeferredValue, useEffect, useState } f
 import { Pressable, View } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 
+import { AddTodoFab } from '@/components/AddTodoFab';
 import { DateHeader } from '@/components/DateHeader';
 import { DateStrip } from '@/components/DateStrip';
 import { DayPager } from '@/components/DayPager';
@@ -110,7 +111,8 @@ export default function TodoScreen() {
       />
 
       {/* Everything below the date strip sits on the list color (white in the light look).
-          The day's todos swipe sideways to the next or previous day. */}
+          The day's todos swipe sideways to the next or previous day; the Add todo button
+          floats over them, staying put while they swipe. */}
       <View style={styles.section}>
         <DayPager
           today={today}
@@ -119,6 +121,7 @@ export default function TodoScreen() {
           renderDay={renderDay}
           swipePosition={swipePosition}
         />
+        <AddTodoFab />
       </View>
     </View>
   );
