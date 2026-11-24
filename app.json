@@ -57,22 +57,12 @@
         "projectId": "99e3ec8d-bc4f-4576-9a39-3921efa69e54"
       },
       "release": {
-        "version": "1.2.0",
+        "version": "1.2.1",
         "notes": [
-          "Upcoming: every todo due after today, by day, like on the web.",
-          "Add a todo with the round + button at the bottom right of Today and Upcoming.",
-          "Reporting replaces Stats: a log of the todos you added, updated, completed and deleted, by day, like on the web.",
-          "Filter Reporting by action and date, and download what it shows as a PDF to save or share.",
-          "Integrations in Profile, with ChatGPT coming soon.",
-          "A new dark look, built on deep, neutral grays.",
-          "The Dooist orange on buttons and checkboxes, and on today's date in the date strip.",
-          "Calendar: connect Google Calendar, see your Google events in Today, and switch todo sync on or off.",
-          "Account: see your picture and email, change your name, set a password, or delete your account.",
-          "Notifications: tap the bell at the top of Profile.",
-          "Delete a todo from its details, with the trash icon beside its name.",
-          "Smoother swiping in the date strip and time pickers, with a steady tick.",
-          "Add time now starts at the current time.",
-          "Check for Updates opens its own page, with what's new in each update."
+          "Send Feedback in Profile: pick what it's about and tell us what you think.",
+          "Zoom into the timeline to see half-hour and quarter-hour marks between the hours.",
+          "Pages opened from Profile keep their header in the same place as Profile's, with no jump.",
+          "Menus open and close faster."
         ]
       }
     },
