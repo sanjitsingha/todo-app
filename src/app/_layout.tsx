@@ -1,7 +1,9 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, type Theme } from 'expo-router';
+import { getHeaderTitle, Header } from 'expo-router/react-navigation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
+import type { NativeStackNavigationOptions } from 'expo-router/native-stack';
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { Appearance, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -112,17 +114,28 @@ function Screens() {
   const styles = useStyles();
   const colors = useColors();
 
-  /** A full page opened on top of the tabs, with a header like Profile's and a back arrow. */
+  /**
+   * A full page opened on top of the tabs, with a header like Profile's and a back arrow. The
+   * header is drawn by the same component as the tabs' headers (src/app/(tabs)/_layout.tsx)
+   * rather than the phone's own, which sat at a different height with its title in a different
+   * place, so going from Profile to a page shifted the header.
+   */
   const pageOptions = (title: string) =>
     ({
       title,
-      headerLeft: () => <BackButton />,
-      headerTitleAlign: 'left',
-      headerTitleStyle: { fontSize: 22, fontWeight: '700', color: colors.text },
-      headerStyle: { backgroundColor: colors.pageHeader },
-      headerShadowVisible: false,
+      header: ({ options, route }) => (
+        <Header
+          title={getHeaderTitle(options, route.name)}
+          headerLeft={() => <BackButton />}
+          headerRight={options.headerRight}
+          headerTitleAlign="left"
+          headerTitleStyle={{ fontSize: 22, fontWeight: '700', color: colors.text }}
+          headerStyle={{ backgroundColor: colors.pageHeader }}
+          headerShadowVisible={false}
+        />
+      ),
       contentStyle: { backgroundColor: colors.page },
-    }) as const;
+    }) satisfies NativeStackNavigationOptions;
   const { user, ready, resettingPassword } = useAuth();
 
   // The sign-in is known: the first real screen can show.
@@ -227,6 +240,20 @@ function Screens() {
         {/* Opened from Profile: other apps Dooist works with, like the web app's
             Integrations (ChatGPT, coming soon). */}
         <Stack.Screen name="integrations" options={pageOptions('Integrations')} />
+        {/* Opened from Profile: a Subject, a message, and Send feedback. */}
+        <Stack.Screen name="feedback" options={pageOptions('Feedback')} />
+        {/* Opened from Feedback's Subject: what part of the app it's about. Just as tall as
+            its options. */}
+        <Stack.Screen
+          name="feedback-subject"
+          options={{
+            presentation: 'formSheet',
+            sheetAllowedDetents: 'fitToContents',
+            sheetGrabberVisible: true,
+            sheetCornerRadius: 24,
+            headerShown: false,
+          }}
+        />
         {/* Opened from Account: changing the name, in a sheet just as tall as its field and
             button. */}
         <Stack.Screen

@@ -23,7 +23,8 @@ const ICON_SIZE = 20;
 type Props<T extends string> = {
   title: string;
   options: readonly Choice<T>[];
-  value: T;
+  /** Null when nothing is picked yet (no radio is filled). */
+  value: T | null;
   /** Saves the pick. The sheet closes on its own just after. */
   onPick: (value: T) => void;
 };

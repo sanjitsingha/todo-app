@@ -7,6 +7,8 @@ import {
   usePinchGesture,
 } from 'react-native-gesture-handler';
 import Animated, {
+  Extrapolation,
+  interpolate,
   scrollTo,
   useAnimatedRef,
   useAnimatedStyle,
@@ -24,14 +26,28 @@ import { formatTime, toDateKey, toDayMinutes, type DateKey } from '@/lib/dates';
 import type { Todo } from '@/store/todos';
 
 /**
- * How tall an hour is, in points: fully zoomed out, at first, and fully zoomed in. Zooming only
- * stretches the hours; the labels stay one per hour.
+ * How tall an hour is, in points: fully zoomed out, at first, and fully zoomed in. Zooming
+ * stretches the hours; the labels stay one per hour, and ticks fade in between them as they get
+ * room (SUB_HOUR_TICKS).
  */
 const MIN_HOUR_HEIGHT = 48;
 const DEFAULT_HOUR_HEIGHT = 64;
 const MAX_HOUR_HEIGHT = 240;
 /** The hours of the day, one label and line each. */
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
+
+/**
+ * The ticks between the hour labels, in the time column on the left like a ruler's, which fade in
+ * while zooming in: half past from 80 points an hour (fully there by 110), then quarter past and
+ * quarter to from 120 (by 160). The quarter ticks are shorter and lighter, so the hours and half
+ * hours stand out. They stay out of the todos' area. The web app's timeline has the same ticks,
+ * and five-minute ones after them.
+ */
+const SUB_HOUR_TICKS = [
+  { minute: 30, width: 14, fadeFrom: 80, fadeTo: 110, opacity: 1 },
+  { minute: 15, width: 9, fadeFrom: 120, fadeTo: 160, opacity: 0.8 },
+  { minute: 45, width: 9, fadeFrom: 120, fadeTo: 160, opacity: 0.8 },
+] as const;
 
 /** Room on the left for the time labels. */
 const GUTTER_WIDTH = 56;
@@ -319,6 +335,16 @@ export function TodoTimeline({ todos, date }: Props) {
           contentContainerStyle={styles.gridContent}
         >
           <Animated.View style={gridHeight}>
+            {HOURS.map((hour) =>
+              SUB_HOUR_TICKS.map((tick) => (
+                <SubHourTick
+                  key={`${hour}:${tick.minute}`}
+                  minutes={hour * 60 + tick.minute}
+                  tick={tick}
+                  hourHeight={hourHeight}
+                />
+              )),
+            )}
             {HOURS.map((hour) => (
               <HourRow key={hour} hour={hour} hourHeight={hourHeight} />
             ))}
@@ -373,6 +399,33 @@ const HourRow = memo(function HourRow({
       <View style={styles.tickLine} />
     </Animated.View>
   );
+});
+
+/**
+ * A tick between the hour labels (half past, quarter past or quarter to), at the right edge of
+ * the time column where the hour lines start, fading in as zooming in gives the hours room for
+ * it, and out again when zooming out. Like HourRow, it moves with a transform, on the UI thread.
+ */
+const SubHourTick = memo(function SubHourTick({
+  minutes,
+  tick,
+  hourHeight,
+}: {
+  minutes: number;
+  tick: (typeof SUB_HOUR_TICKS)[number];
+  hourHeight: SharedValue<number>;
+}) {
+  const styles = useStyles();
+  const { width, fadeFrom, fadeTo, opacity } = tick;
+  const look = useAnimatedStyle(() => {
+    const height = hourHeight.get();
+    return {
+      opacity: interpolate(height, [fadeFrom, fadeTo], [0, opacity], Extrapolation.CLAMP),
+      transform: [{ translateY: offsetOf(minutes, height) }],
+    };
+  });
+
+  return <Animated.View style={[styles.subHourTick, { left: GUTTER_WIDTH - width, width }, look]} />;
 });
 
 /** Holds one todo's block at its place on the timeline, following the zoom. */
@@ -537,6 +590,13 @@ const useStyles = createThemedStyles((colors) => ({
     flex: 1,
     height: StyleSheet.hairlineWidth,
     marginEnd: 16,
+    backgroundColor: colors.border,
+  },
+  // Its length and place along the labels' edge come from SUB_HOUR_TICKS.
+  subHourTick: {
+    position: 'absolute',
+    top: 0,
+    height: StyleSheet.hairlineWidth,
     backgroundColor: colors.border,
   },
   blocks: {

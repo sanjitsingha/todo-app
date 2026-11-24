@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Text,
   useWindowDimensions,
-  View,
   type PressableInstance,
 } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { createThemedStyles, useColors } from '@/hooks/useTheme';
 
@@ -31,6 +31,8 @@ type Anchor = { x: number; y: number; width: number; height: number };
 /** Space between the button and its menu. */
 const MENU_GAP = 4;
 const ITEM_HEIGHT = 44;
+/** The menu's quick fade in as it opens. */
+const MENU_FADE_IN = FadeIn.duration(120);
 const MENU_PADDING = 6;
 /** The menu never comes closer than this to the top or bottom of the screen. */
 const SCREEN_MARGIN = 16;
@@ -46,7 +48,7 @@ export function OverflowMenu({ actions, accessibilityLabel }: Props) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const triggerRef = useRef<PressableInstance>(null);
   const [isOpen, setIsOpen] = useState(false);
-  // Kept after closing, so the menu stays in place while it fades out.
+  // Where the button was when the menu last opened.
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [layerHeight, setLayerHeight] = useState(windowHeight);
 
@@ -82,7 +84,9 @@ export function OverflowMenu({ actions, accessibilityLabel }: Props) {
       <Modal
         visible={isOpen}
         transparent
-        animationType="fade"
+        // No Modal fade: Android's lasts 200 ms and starts slowly, so the menu felt late to
+        // show. The menu fades in quickly by itself (MENU_FADE_IN) and closes at once.
+        animationType="none"
         onRequestClose={close}
         statusBarTranslucent
         navigationBarTranslucent
@@ -94,7 +98,8 @@ export function OverflowMenu({ actions, accessibilityLabel }: Props) {
           accessibilityLabel="Close menu"
         />
         {anchor ? (
-          <View
+          <Animated.View
+            entering={MENU_FADE_IN}
             style={[
               styles.menu,
               opensUp
@@ -118,7 +123,7 @@ export function OverflowMenu({ actions, accessibilityLabel }: Props) {
                 </Text>
               </Pressable>
             ))}
-          </View>
+          </Animated.View>
         ) : null}
       </Modal>
     </>

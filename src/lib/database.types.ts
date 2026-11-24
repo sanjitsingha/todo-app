@@ -1,6 +1,7 @@
 /**
  * The app's tables in Supabase, as the client sees them. Written to match
- * supabase/migrations (20261117120000_todos_and_settings.sql, 20261119120000_google_calendar.sql);
+ * supabase/migrations (20261117120000_todos_and_settings.sql, 20261119120000_google_calendar.sql,
+ * 20261124120000_feedback.sql);
  * keep them in step. Timestamps come back as ISO strings, dates as "YYYY-MM-DD", times of day
  * as "HH:mm". The Google token tables there are server only, so they aren't here.
  */
@@ -61,6 +62,23 @@ export type CalendarConnectionRow = {
   updated_at: string;
 };
 
+export type FeedbackSubject =
+  | 'bug'
+  | 'idea'
+  | 'todos'
+  | 'calendar'
+  | 'account'
+  | 'design'
+  | 'other';
+
+/** Send only: people can add feedback but not read it back (20261124120000_feedback.sql). */
+export type FeedbackInsert = {
+  subject: FeedbackSubject;
+  message: string;
+  app_version: string | null;
+  platform: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -79,6 +97,12 @@ export type Database = {
       calendar_connections: {
         Row: CalendarConnectionRow;
         Insert: never;
+        Update: never;
+        Relationships: [];
+      };
+      feedback: {
+        Row: FeedbackInsert & { id: string; user_id: string | null; created_at: string };
+        Insert: FeedbackInsert;
         Update: never;
         Relationships: [];
       };

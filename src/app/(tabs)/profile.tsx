@@ -6,6 +6,7 @@ import CalendarSync from 'lucide-react-native/icons/calendar-sync';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CircleUserRound from 'lucide-react-native/icons/circle-user-round';
 import LogOut from 'lucide-react-native/icons/log-out';
+import MessageSquareText from 'lucide-react-native/icons/message-square-text';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import SunMoon from 'lucide-react-native/icons/sun-moon';
@@ -114,9 +115,10 @@ function CalendarRow({ userId }: { userId: string }) {
 
 /**
  * The Profile tab: the app's settings and accounts, top to bottom: Account, Haptic Feedback,
- * Appearance, Check for Updates, Calendar, Integrations, Privacy Policy, then Log Out (signing
- * in is required, so someone always is). Account and Check for Updates open pages of their own
- * (src/app/account.tsx, src/app/updates.tsx); Haptic Feedback and Appearance open bottom sheets
+ * Appearance, Check for Updates, Calendar, Integrations, Send Feedback, Privacy Policy, then
+ * Log Out (signing in is required, so someone always is). Account, Check for Updates and Send
+ * Feedback open pages of their own (src/app/account.tsx, src/app/updates.tsx,
+ * src/app/feedback.tsx); Haptic Feedback and Appearance open bottom sheets
  * (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Calendar and Integrations open their
  * pages (src/app/calendar.tsx, src/app/integrations.tsx); Privacy Policy is in place for what
  * comes next. The bell in the header opens
@@ -149,6 +151,11 @@ export default function ProfileScreen() {
       {user ? <CalendarRow userId={user.id} /> : null}
       {/* The web app's Integrations icon. */}
       <Row icon={Blocks} title="Integrations" onPress={() => router.push('/integrations')} />
+      <Row
+        icon={MessageSquareText}
+        title="Send Feedback"
+        onPress={() => router.push('/feedback')}
+      />
       <Row icon={ShieldCheck} title="Privacy Policy" />
       <Row icon={LogOut} title="Log Out" destructive accessory={null} onPress={confirmLogOut} />
     </ScrollView>
