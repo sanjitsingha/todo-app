@@ -8,6 +8,7 @@ import CircleUserRound from 'lucide-react-native/icons/circle-user-round';
 import LogOut from 'lucide-react-native/icons/log-out';
 import MessageSquareText from 'lucide-react-native/icons/message-square-text';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import Settings2 from 'lucide-react-native/icons/settings-2';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import SunMoon from 'lucide-react-native/icons/sun-moon';
 import Vibrate from 'lucide-react-native/icons/vibrate';
@@ -114,11 +115,11 @@ function CalendarRow({ userId }: { userId: string }) {
 }
 
 /**
- * The Profile tab: the app's settings and accounts, top to bottom: Account, Haptic Feedback,
- * Appearance, Check for Updates, Calendar, Integrations, Send Feedback, Privacy Policy, then
- * Log Out (signing in is required, so someone always is). Account, Check for Updates and Send
- * Feedback open pages of their own (src/app/account.tsx, src/app/updates.tsx,
- * src/app/feedback.tsx); Haptic Feedback and Appearance open bottom sheets
+ * The Profile tab: the app's settings and accounts, top to bottom: Account, General, Haptic
+ * Feedback, Appearance, Check for Updates, Calendar, Integrations, Send Feedback, Privacy Policy,
+ * then Log Out (signing in is required, so someone always is). Account, General, Check for
+ * Updates and Send Feedback open pages of their own (src/app/account.tsx, src/app/general.tsx,
+ * src/app/updates.tsx, src/app/feedback.tsx); Haptic Feedback and Appearance open bottom sheets
  * (src/app/haptic-feedback.tsx, src/app/appearance.tsx); Calendar and Integrations open their
  * pages (src/app/calendar.tsx, src/app/integrations.tsx); Privacy Policy is in place for what
  * comes next. The bell in the header opens
@@ -135,6 +136,8 @@ export default function ProfileScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Row icon={CircleUserRound} title="Account" onPress={() => router.push('/account')} />
+      {/* The web app's Settings › General: Hide completed todos, and Recently deleted. */}
+      <Row icon={Settings2} title="General" onPress={() => router.push('/general')} />
       <Row
         icon={Vibrate}
         title="Haptic Feedback"

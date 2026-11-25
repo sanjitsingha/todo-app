@@ -1,7 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-// Just this icon, not the whole icon set.
-import Trash2 from 'lucide-react-native/icons/trash-2';
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   Alert,
@@ -16,11 +14,13 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OverflowMenu, type OverflowAction } from '@/components/OverflowMenu';
 import { PriorityField } from '@/components/PriorityField';
 import { SheetGrabber } from '@/components/SheetGrabber';
 import { DueDateChip, dueLabel, ReminderChip } from '@/components/TodoChips';
 import { createThemedStyles, useColors } from '@/hooks/useTheme';
-import { formatTime } from '@/lib/dates';
+import { useToday } from '@/hooks/useToday';
+import { addDays, formatTime, toDateKey } from '@/lib/dates';
 import { useTodos, type Todo } from '@/store/todos';
 
 /**
@@ -28,14 +28,16 @@ import { useTodos, type Todo } from '@/store/todos';
  * sheet, see src/app/_layout.tsx). Everything in it can be changed in place, with no separate
  * edit mode: tap the name or description to type, tap Due date or Reminder for their sheets
  * (which save to this todo and come back here), or tap a priority. The button at the bottom
- * marks it done (or not done) and closes the sheet. The trash beside the name deletes it, after
- * asking.
+ * marks it done (or not done) and closes the sheet. The ⋮ beside the name has Move to tomorrow
+ * (for a todo still to do that's due today or overdue) and Delete, which asks first; as in the
+ * web app.
  */
 export default function TodoDetailsScreen() {
   const styles = useStyles();
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const today = useToday();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { todos, updateTodo, toggleTodo, deleteTodo } = useTodos();
   // While the sheet slides away after the button is pressed, it keeps showing the todo as it
@@ -61,18 +63,22 @@ export default function TodoDetailsScreen() {
   const confirmDelete = () => {
     if (!todo) return;
     Keyboard.dismiss();
-    Alert.alert('Delete this todo?', `“${todo.title}” will be deleted. This can’t be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          setClosingWith(todo);
-          deleteTodo(todo.id);
-          router.back();
+    Alert.alert(
+      'Delete this todo?',
+      `“${todo.title}” will be deleted. For 30 days, you can restore it from Recently deleted, in Profile › General.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setClosingWith(todo);
+            deleteTodo(todo.id);
+            router.back();
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   if (!todo) {
@@ -89,6 +95,22 @@ export default function TodoDetailsScreen() {
     toggleTodo(todo.id);
     router.back();
   };
+
+  // Only for a todo still to do that's due today or overdue: one due later would move earlier.
+  const canMoveToTomorrow = !todo.completed && todo.dueDate <= toDateKey(today);
+
+  /** A day on from today, with the same due time and reminder. The sheet closes. */
+  const moveToTomorrow = () => {
+    Keyboard.dismiss();
+    setClosingWith(todo);
+    updateTodo(todo.id, { dueDate: toDateKey(addDays(today, 1)) });
+    router.back();
+  };
+
+  const menuActions: OverflowAction[] = [
+    ...(canMoveToTomorrow ? [{ label: 'Move to tomorrow', onPress: moveToTomorrow }] : []),
+    { label: 'Delete', onPress: confirmDelete, destructive: true },
+  ];
 
   const openDueDate = () => {
     Keyboard.dismiss();
@@ -127,7 +149,7 @@ export default function TodoDetailsScreen() {
     >
       <SheetGrabber />
 
-      {/* The name, with the trash at its right. */}
+      {/* The name, with the ⋮ at its right. */}
       <View style={styles.titleRow}>
         {/* Looks like plain text until tapped. Multiline only so a long name wraps: Enter
             finishes editing, and pasted line breaks become spaces. */}
@@ -152,15 +174,9 @@ export default function TodoDetailsScreen() {
           accessibilityLabel="Todo name"
           accessibilityHint="Edits the name"
         />
-        <Pressable
-          onPress={confirmDelete}
-          hitSlop={10}
-          style={({ pressed }) => [styles.delete, pressed && styles.deletePressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Delete todo"
-        >
-          <Trash2 size={DELETE_ICON_SIZE} color={colors.danger} />
-        </Pressable>
+        <View style={styles.menu}>
+          <OverflowMenu accessibilityLabel="Todo options" actions={menuActions} />
+        </View>
       </View>
       <TextInput
         style={[styles.input, styles.description]}
@@ -306,8 +322,8 @@ function DetailRow({
   );
 }
 
-/** A size down from the other icons in the sheet, so it stays out of the way of the name. */
-const DELETE_ICON_SIZE = 18;
+/** The ⋮ button's height: its 20 pt icon and 8 pt of padding all round (OverflowMenu). */
+const MENU_BUTTON_SIZE = 36;
 
 const useStyles = createThemedStyles((colors) => ({
   // Fills the sheet, so it's white all the way down when dragged to full screen.
@@ -346,18 +362,15 @@ const useStyles = createThemedStyles((colors) => ({
     alignItems: 'flex-start',
     gap: 12,
   },
-  // Takes the row, so a long name wraps before the trash.
+  // Takes the row, so a long name wraps before the ⋮.
   titleInput: {
     flex: 1,
   },
   // Lined up with the name's first line: its top padding (8), plus half its line height (14),
-  // less half the icon.
-  delete: {
-    marginTop: 8 + 14 - DELETE_ICON_SIZE / 2,
-    borderRadius: 8,
-  },
-  deletePressed: {
-    opacity: 0.5,
+  // less half the button. Pulled right by the button's padding, so the icon meets the edge.
+  menu: {
+    marginTop: 8 + 14 - MENU_BUTTON_SIZE / 2,
+    marginRight: -8,
   },
   description: {
     paddingTop: 4,

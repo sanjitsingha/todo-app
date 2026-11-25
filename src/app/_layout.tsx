@@ -235,6 +235,8 @@ function Screens() {
         <Stack.Screen name="notifications" options={pageOptions('Notifications')} />
         {/* Opened from Profile: Avatar, Name, Email, Password, Delete account. */}
         <Stack.Screen name="account" options={pageOptions('Account')} />
+        {/* Opened from Profile: Hide completed todos, and Recently deleted. */}
+        <Stack.Screen name="general" options={pageOptions('General')} />
         {/* Opened from Profile: Google Calendar's account, Events and Todo sync. */}
         <Stack.Screen name="calendar" options={pageOptions('Calendar')} />
         {/* Opened from Profile: other apps Dooist works with, like the web app's

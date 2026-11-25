@@ -11,6 +11,7 @@ import { TodoTimeline } from '@/components/TodoTimeline';
 import { formatDayPhrase, type DateKey } from '@/lib/dates';
 import { useAuth } from '@/store/auth';
 import { useDayEvents } from '@/store/calendarEvents';
+import { useHideCompleted } from '@/store/hideCompleted';
 import { compareTodos, useTodos, type Todo } from '@/store/todos';
 
 /**
@@ -41,22 +42,25 @@ type Props = {
 /**
  * One day's todos, as a list of cards or as a timeline: a page of the day pager
  * (src/components/DayPager.tsx). With Events on (the Calendar page), the day's Google Calendar
- * events sit above them.
+ * events sit above them. With Hide completed todos on (Profile › General), the done ones are
+ * left out of both.
  */
 export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Props) {
   const { pendingTodos, completedTodos } = useDayTodos(date);
+  const hideCompleted = useHideCompleted();
   const { user } = useAuth();
   const events = useDayEvents(date, user?.id ?? null);
   const eventsHeader = events.length > 0 ? <DayEvents events={events} date={date} /> : null;
 
   // The cards: unfinished todos in the list, finished ones in a Completed section below it.
-  const showCompletedSection = completedTodos.length > 0;
+  const shownCompleted = hideCompleted ? [] : completedTodos;
+  const showCompletedSection = shownCompleted.length > 0;
   const isEmpty = pendingTodos.length === 0 && !showCompletedSection;
 
-  // The timeline shows every todo, finished ones included.
+  // The timeline shows every todo, finished ones included, unless they're hidden.
   const timelineTodos = useMemo(
-    () => [...pendingTodos, ...completedTodos],
-    [pendingTodos, completedTodos],
+    () => (hideCompleted ? pendingTodos : [...pendingTodos, ...completedTodos]),
+    [pendingTodos, completedTodos, hideCompleted],
   );
 
   if (showTimeline) {
@@ -71,6 +75,18 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
 
   // No todos, and no events either.
   if (isEmpty && !eventsHeader) {
+    const hidden = completedTodos.length;
+    if (hidden > 0) {
+      return (
+        <ScreenPlaceholder
+          icon="checkmark-done-outline"
+          title="All done"
+          subtitle={`Everything due ${formatDayPhrase(date, today)} is done. ${
+            hidden === 1 ? '1 completed todo is' : `${hidden} completed todos are`
+          } hidden. To show them, turn off Hide completed todos in Profile, under General.`}
+        />
+      );
+    }
     return (
       <ScreenPlaceholder
         icon="list-outline"
@@ -87,7 +103,7 @@ export const DayTodos = memo(function DayTodos({ date, today, showTimeline }: Pr
       renderItem={renderTodo}
       ListHeaderComponent={eventsHeader ?? undefined}
       ListFooterComponent={
-        showCompletedSection ? <CompletedSection todos={completedTodos} /> : undefined
+        showCompletedSection ? <CompletedSection todos={shownCompleted} /> : undefined
       }
       contentContainerStyle={styles.list}
       showsVerticalScrollIndicator={false}

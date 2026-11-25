@@ -71,6 +71,7 @@ type TodosValue = {
   updateTodo: (id: string, changes: TodoChanges) => void;
   toggleTodo: (id: string) => void;
   deleteTodo: (id: string) => void;
+  restoreTodo: (todo: Todo) => void;
 };
 
 const STORAGE_KEY = 'todos';
@@ -156,8 +157,12 @@ export function updateTodos(update: (current: Todo[]) => Todo[]) {
  * deleted there (src/lib/todoSync.ts), so they go from the user's other phones and Google
  * Calendar too, and won't come back from the account meanwhile. Saved on the phone, so a
  * deletion made offline still reaches the account later.
+ *
+ * `todo` is a copy of one with changes the account doesn't have yet (or that never reached it),
+ * so the sync saves it as it was, deleted, and Recently deleted can bring that version back.
+ * `userId` is missing only for a todo deleted before it was synced: the next sync claims it.
  */
-export type DeletedTodo = { id: string; userId: string };
+export type DeletedTodo = { id: string; userId?: string; todo?: Todo };
 
 const DELETED_STORAGE_KEY = 'todos.deleted';
 
@@ -168,7 +173,9 @@ function loadDeleted(): DeletedTodo[] {
     return Array.isArray(parsed)
       ? parsed.filter(
           (entry): entry is DeletedTodo =>
-            typeof entry?.id === 'string' && typeof entry?.userId === 'string',
+            typeof entry?.id === 'string' &&
+            (typeof entry?.userId === 'string' ||
+              (entry?.userId === undefined && typeof entry?.todo === 'object')),
         )
       : [];
   } catch {
@@ -199,6 +206,19 @@ export function forgetDeletedTodos(ids: ReadonlySet<string>) {
   }
 }
 
+/** Makes deletions of todos that were never synced `userId`'s, like the todos themselves. */
+export function claimDeletedTodos(userId: string) {
+  if (deletedTodos.some((entry) => entry.userId === undefined)) {
+    saveDeleted(
+      deletedTodos.map((entry) =>
+        entry.userId === undefined && entry.todo
+          ? { ...entry, userId, todo: { ...entry.todo, userId } }
+          : entry,
+      ),
+    );
+  }
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
@@ -226,14 +246,30 @@ function updateTodo(id: string, changes: TodoChanges) {
 }
 
 /**
- * Deletes a todo: it goes from the phone at once (and its reminder with it). One that's in an
- * account is noted, so the next sync deletes it there too (getDeletedTodos).
+ * Deletes a todo: it goes from the phone at once (and its reminder with it). It's noted, so the
+ * next sync marks it deleted in the account (getDeletedTodos), where Recently deleted can bring
+ * it back for 30 days.
  */
 function deleteTodo(id: string) {
   const todo = todos.find((candidate) => candidate.id === id);
   if (!todo) return;
-  if (todo.userId) saveDeleted([...deletedTodos, { id, userId: todo.userId }]);
+  saveDeleted([
+    ...deletedTodos,
+    { id, userId: todo.userId, ...(todo.unsynced || !todo.userId ? { todo } : {}) },
+  ]);
   updateTodos((current) => current.filter((candidate) => candidate.id !== id));
+}
+
+/**
+ * Brings back a deleted todo (Profile › General › Recently deleted) as it was, on its due date.
+ * It counts as a change, so the next sync takes it out of the account's deleted todos and it
+ * comes back on the user's other devices too.
+ */
+function restoreTodo(todo: Todo) {
+  forgetDeletedTodos(new Set([todo.id]));
+  updateTodos((current) =>
+    current.some((candidate) => candidate.id === todo.id) ? current : [...current, changed(todo)],
+  );
 }
 
 // Marking a todo done notes when, for the Reporting tab's log; undoing it clears that.
@@ -266,7 +302,7 @@ export function TodosProvider({ children }: { children: ReactNode }) {
 export function useTodos(): TodosValue {
   const current = useSyncExternalStore(subscribe, getTodos);
   return useMemo(
-    () => ({ todos: current, addTodo, updateTodo, toggleTodo, deleteTodo }),
+    () => ({ todos: current, addTodo, updateTodo, toggleTodo, deleteTodo, restoreTodo }),
     [current],
   );
 }

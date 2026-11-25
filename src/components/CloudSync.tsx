@@ -13,46 +13,54 @@ import { useTodos } from '@/store/todos';
 const CHANGE_DELAY_MS = 1500;
 
 // One sync at a time. Asking while one runs runs one more after it, for the latest account.
-let running = false;
+let running: Promise<void> | null = null;
 let wanted: string | null = null;
 
 async function runSyncs() {
-  if (running) return;
-  running = true;
-  try {
-    while (wanted) {
-      const userId = wanted;
-      wanted = null;
-      try {
-        await syncTodos(userId);
-        await syncSettings(userId);
-      } catch (error) {
-        // Offline, most likely. Nothing is lost: it's all on the phone, marked to send.
-        console.warn('Could not sync with your account; will try again later.', error);
-        break;
-      }
-      // After the todos are up, so the server sends Google the latest. Its own failures don't
-      // stop the account's syncing: the server remembers how far it got.
-      try {
-        await syncGoogleCalendar(userId);
-      } catch (error) {
-        console.warn('Could not update Google Calendar; will try again later.', error);
-      }
-      // The person's own events, for Today, when Events is on (cleared when it's off).
-      try {
-        await refreshCalendarEvents(userId);
-      } catch (error) {
-        console.warn('Could not load calendar events; will try again later.', error);
-      }
+  while (wanted) {
+    const userId = wanted;
+    wanted = null;
+    try {
+      await syncTodos(userId);
+      await syncSettings(userId);
+    } catch (error) {
+      // Offline, most likely. Nothing is lost: it's all on the phone, marked to send.
+      console.warn('Could not sync with your account; will try again later.', error);
+      break;
     }
-  } finally {
-    running = false;
+    // After the todos are up, so the server sends Google the latest. Its own failures don't
+    // stop the account's syncing: the server remembers how far it got.
+    try {
+      await syncGoogleCalendar(userId);
+    } catch (error) {
+      console.warn('Could not update Google Calendar; will try again later.', error);
+    }
+    // The person's own events, for Today, when Events is on (cleared when it's off).
+    try {
+      await refreshCalendarEvents(userId);
+    } catch (error) {
+      console.warn('Could not load calendar events; will try again later.', error);
+    }
   }
 }
 
-function requestSync(userId: string) {
+/**
+ * Syncs the phone with `userId`'s account now (or right after the sync under way). Resolves
+ * once that's done, or has failed (offline): it never rejects. Recently deleted waits on it,
+ * so todos just deleted on the phone are in the account before it asks for them.
+ */
+export function syncWithAccount(userId: string): Promise<void> {
   wanted = userId;
-  void runSyncs();
+  running ??= runSyncs().finally(() => {
+    running = null;
+    // Asked for just as the last one finished: run it, and resolve after it.
+    return wanted ? syncWithAccount(wanted) : undefined;
+  });
+  return running;
+}
+
+function requestSync(userId: string) {
+  void syncWithAccount(userId);
 }
 
 /**

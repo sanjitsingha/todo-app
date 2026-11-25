@@ -3,6 +3,7 @@ import Storage from 'expo-sqlite/kv-store';
 import type { TodoInsert, TodoRow } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 import {
+  claimDeletedTodos,
   forgetDeletedTodos,
   getDeletedTodos,
   getTodos,
@@ -12,6 +13,7 @@ import {
 
 /** Rows asked for or sent in one request. */
 const PAGE_SIZE = 500;
+const DAY_MS = 24 * 60 * 60 * 1000;
 /**
  * Each pull asks again for a little before the newest change it saw last time, in case a
  * change was saved just as the last pull ran. Seeing a row twice does no harm.
@@ -43,7 +45,7 @@ function toRow(todo: Todo, userId: string): TodoInsert {
   };
 }
 
-function fromRow(row: TodoRow): Todo {
+export function fromRow(row: TodoRow): Todo {
   return {
     id: row.id,
     userId: row.user_id,
@@ -85,6 +87,7 @@ function sameTodo(a: Todo, b: Todo): boolean {
  * that account; they aren't mixed into this one.
  */
 function claimTodos(userId: string) {
+  claimDeletedTodos(userId);
   updateTodos((current) => {
     if (current.every((todo) => todo.userId === userId)) return current;
     return current
@@ -129,22 +132,66 @@ async function pushTodos(userId: string) {
 
 /**
  * Marks the todos deleted on the phone as deleted in the account (`deleted_at`), which is how
- * the user's other phones and the Google Calendar sync hear of it. One that never reached the
- * account matches no row, which is fine.
+ * the user's other phones and the Google Calendar sync hear of it. One deleted with changes the
+ * account didn't have yet (or before it ever reached it) is saved as it was, deleted, so
+ * Recently deleted brings back that version.
  */
 async function pushDeletions(userId: string) {
   if (!supabase) return;
   const waiting = getDeletedTodos().filter((entry) => entry.userId === userId);
   for (let start = 0; start < waiting.length; start += PAGE_SIZE) {
-    const ids = waiting.slice(start, start + PAGE_SIZE).map((entry) => entry.id);
-    const { error } = await supabase
-      .from('todos')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('user_id', userId)
-      .in('id', ids);
-    if (error) throw error;
-    forgetDeletedTodos(new Set(ids));
+    const batch = waiting.slice(start, start + PAGE_SIZE);
+    const deletedAt = new Date().toISOString();
+
+    const copies = batch.flatMap((entry) =>
+      entry.todo ? [{ ...toRow(entry.todo, userId), deleted_at: deletedAt }] : [],
+    );
+    if (copies.length > 0) {
+      const { error } = await supabase
+        .from('todos')
+        .upsert(copies, { onConflict: 'user_id,id' });
+      if (error) throw error;
+    }
+
+    const ids = batch.filter((entry) => !entry.todo).map((entry) => entry.id);
+    if (ids.length > 0) {
+      const { error } = await supabase
+        .from('todos')
+        .update({ deleted_at: deletedAt })
+        .eq('user_id', userId)
+        .in('id', ids);
+      if (error) throw error;
+    }
+
+    forgetDeletedTodos(new Set(batch.map((entry) => entry.id)));
   }
+}
+
+/** A todo in Recently deleted, and when it was deleted. */
+export type RecentlyDeletedTodo = { todo: Todo; deletedAt: number };
+
+/** `userId`'s todos deleted in the last `days` days, the latest first. */
+export async function fetchRecentlyDeleted(
+  userId: string,
+  days: number,
+): Promise<RecentlyDeletedTodo[]> {
+  if (!supabase) return [];
+  const since = new Date(Date.now() - days * DAY_MS).toISOString();
+  const rows: TodoRow[] = [];
+  for (let start = 0; ; start += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('todos')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('deleted_at', since)
+      .order('deleted_at', { ascending: false })
+      .order('id')
+      .range(start, start + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < PAGE_SIZE) break;
+  }
+  return rows.map((row) => ({ todo: fromRow(row), deletedAt: Date.parse(row.deleted_at ?? '') }));
 }
 
 /**

@@ -1,16 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OverflowMenu } from '@/components/OverflowMenu';
+import { SectionTitle, SwitchRow } from '@/components/SettingRows';
 import { createThemedStyles, useColors } from '@/hooks/useTheme';
 import { useAuth } from '@/store/auth';
 import {
@@ -26,47 +19,6 @@ import { clearCalendarEvents, refreshCalendarEvents } from '@/store/calendarEven
 
 /** What's under way, so the controls it touches wait. */
 type Busy = 'connect' | 'resync' | 'disconnect' | 'events' | 'sync' | null;
-
-/** A section's title, above its rows. */
-function SectionTitle({ children }: { children: string }) {
-  const styles = useStyles();
-  return (
-    <Text style={styles.sectionTitle} accessibilityRole="header">
-      {children}
-    </Text>
-  );
-}
-
-type SwitchRowProps = {
-  title: string;
-  description: string;
-  value: boolean;
-  disabled: boolean;
-  onChange: (value: boolean) => void;
-};
-
-/** A setting that's on or off: its name and a line about it, with the switch at the right. */
-function SwitchRow({ title, description, value, disabled, onChange }: SwitchRowProps) {
-  const styles = useStyles();
-  const colors = useColors();
-  return (
-    <View style={[styles.row, disabled && styles.rowDisabled]}>
-      <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{title}</Text>
-        <Text style={styles.rowDescription}>{description}</Text>
-      </View>
-      <Switch
-        value={value}
-        onValueChange={onChange}
-        disabled={disabled}
-        trackColor={{ false: colors.border, true: colors.primary }}
-        thumbColor={colors.onPrimary}
-        ios_backgroundColor={colors.border}
-        accessibilityLabel={title}
-      />
-    </View>
-  );
-}
 
 /** The page's main button: Connect Google Calendar, or Reconnect. */
 function MainButton({ label, onPress, busy }: { label: string; onPress: () => void; busy: boolean }) {
@@ -270,14 +222,7 @@ const useStyles = createThemedStyles((colors) => ({
   content: {
     paddingTop: 8,
   },
-  sectionTitle: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 4,
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
+  // The account row: laid out like the switch rows (src/components/SettingRows.tsx).
   row: {
     minHeight: 64,
     flexDirection: 'row',
@@ -285,9 +230,6 @@ const useStyles = createThemedStyles((colors) => ({
     gap: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
-  },
-  rowDisabled: {
-    opacity: 0.5,
   },
   rowText: {
     flex: 1,
